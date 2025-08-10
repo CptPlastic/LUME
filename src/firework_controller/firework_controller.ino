@@ -22,6 +22,7 @@
 
 void setup() {
   // Initialize firework channels and special buttons as outputs
+  Serial.begin(115200);
   pinMode(FIRE_CHANNEL_1, OUTPUT);
   pinMode(FIRE_CHANNEL_2, OUTPUT);
   pinMode(FIRE_CHANNEL_3, OUTPUT);
@@ -58,19 +59,34 @@ void setup() {
 void loop() {
   // Simulate pressing each button one at a time for testing
   int testDelay = 500; // ms
+  Serial.println("Testing FIRE_CHANNEL_1");
   digitalWrite(FIRE_CHANNEL_1, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_1, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_2");
   digitalWrite(FIRE_CHANNEL_2, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_2, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_3");
   digitalWrite(FIRE_CHANNEL_3, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_3, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_4");
   digitalWrite(FIRE_CHANNEL_4, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_4, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_5");
   digitalWrite(FIRE_CHANNEL_5, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_5, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_6");
   digitalWrite(FIRE_CHANNEL_6, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_6, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_7");
   digitalWrite(FIRE_CHANNEL_7, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_7, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_8");
   digitalWrite(FIRE_CHANNEL_8, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_8, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_9");
   digitalWrite(FIRE_CHANNEL_9, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_9, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_10");
   digitalWrite(FIRE_CHANNEL_10, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_10, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_11");
   digitalWrite(FIRE_CHANNEL_11, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_11, HIGH);
+  Serial.println("Testing FIRE_CHANNEL_12");
   digitalWrite(FIRE_CHANNEL_12, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_12, HIGH);
+  Serial.println("Testing RAPID_ALL_FIRE");
   digitalWrite(RAPID_ALL_FIRE, LOW); delay(testDelay); digitalWrite(RAPID_ALL_FIRE, HIGH);
+  Serial.println("Testing AREA_MODULATION_UP");
   digitalWrite(AREA_MODULATION_UP, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_UP, HIGH);
+  Serial.println("Testing AREA_MODULATION_DOWN");
   digitalWrite(AREA_MODULATION_DOWN, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_DOWN, HIGH);
 }
