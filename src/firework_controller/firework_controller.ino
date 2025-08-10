@@ -20,8 +20,15 @@
 #define AREA_MODULATION_UP    5
 #define AREA_MODULATION_DOWN  15
 
+// Area and channel tracking
+#include <Preferences.h>
+Preferences prefs;
+int currentArea = 1;
+const int minArea = 1;
+const int maxArea = 99;
+const int channelsPerArea = 16; // 4 remotes x 4 channels
+
 void setup() {
-  // Initialize firework channels and special buttons as outputs
   Serial.begin(115200);
   pinMode(FIRE_CHANNEL_1, OUTPUT);
   pinMode(FIRE_CHANNEL_2, OUTPUT);
@@ -38,7 +45,6 @@ void setup() {
   pinMode(RAPID_ALL_FIRE, OUTPUT);
   pinMode(AREA_MODULATION_UP, OUTPUT);
   pinMode(AREA_MODULATION_DOWN, OUTPUT);
-  // Set all channels and special buttons HIGH (unpressed state)
   digitalWrite(FIRE_CHANNEL_1, HIGH);
   digitalWrite(FIRE_CHANNEL_2, HIGH);
   digitalWrite(FIRE_CHANNEL_3, HIGH);
@@ -54,39 +60,65 @@ void setup() {
   digitalWrite(RAPID_ALL_FIRE, HIGH);
   digitalWrite(AREA_MODULATION_UP, HIGH);
   digitalWrite(AREA_MODULATION_DOWN, HIGH);
+  // Load area from NVS
+  prefs.begin("firework", false);
+  currentArea = prefs.getInt("area", 1);
+  Serial.print("Loaded Area: "); Serial.println(currentArea);
+}
+
+void pulseButton(int pin, int pulseMs) {
+  digitalWrite(pin, LOW);
+  delay(pulseMs);
+  digitalWrite(pin, HIGH);
 }
 
 void loop() {
-  // Simulate pressing each button one at a time for testing
-  int testDelay = 500; // ms
-  Serial.println("Testing FIRE_CHANNEL_1");
-  digitalWrite(FIRE_CHANNEL_1, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_1, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_2");
-  digitalWrite(FIRE_CHANNEL_2, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_2, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_3");
-  digitalWrite(FIRE_CHANNEL_3, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_3, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_4");
-  digitalWrite(FIRE_CHANNEL_4, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_4, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_5");
-  digitalWrite(FIRE_CHANNEL_5, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_5, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_6");
-  digitalWrite(FIRE_CHANNEL_6, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_6, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_7");
-  digitalWrite(FIRE_CHANNEL_7, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_7, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_8");
-  digitalWrite(FIRE_CHANNEL_8, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_8, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_9");
-  digitalWrite(FIRE_CHANNEL_9, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_9, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_10");
-  digitalWrite(FIRE_CHANNEL_10, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_10, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_11");
-  digitalWrite(FIRE_CHANNEL_11, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_11, HIGH);
-  Serial.println("Testing FIRE_CHANNEL_12");
-  digitalWrite(FIRE_CHANNEL_12, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_12, HIGH);
+  int channelDelay = 1000; // ms for channel test
+  int areaPulse = 50;      // ms for area modulation
+
+  // Simulate area up
+  Serial.print("Area before up: "); Serial.println(currentArea);
+  pulseButton(AREA_MODULATION_UP, areaPulse);
+  currentArea++;
+  if (currentArea > maxArea) currentArea = minArea;
+  prefs.putInt("area", currentArea);
+  Serial.print("Area after up: "); Serial.println(currentArea);
+  delay(500);
+
+  // Simulate area down
+  Serial.print("Area before down: "); Serial.println(currentArea);
+  pulseButton(AREA_MODULATION_DOWN, areaPulse);
+  currentArea--;
+  if (currentArea < minArea) currentArea = maxArea;
+  prefs.putInt("area", currentArea);
+  Serial.print("Area after down: "); Serial.println(currentArea);
+  delay(500);
+
+  // Run through all channels for current area
+  Serial.print("Testing Area: "); Serial.println(currentArea);
+  for (int ch = 1; ch <= 12; ch++) {
+    Serial.print("Testing Channel "); Serial.println(ch);
+    int pin = 0;
+    switch(ch) {
+      case 1: pin = FIRE_CHANNEL_1; break;
+      case 2: pin = FIRE_CHANNEL_2; break;
+      case 3: pin = FIRE_CHANNEL_3; break;
+      case 4: pin = FIRE_CHANNEL_4; break;
+      case 5: pin = FIRE_CHANNEL_5; break;
+      case 6: pin = FIRE_CHANNEL_6; break;
+      case 7: pin = FIRE_CHANNEL_7; break;
+      case 8: pin = FIRE_CHANNEL_8; break;
+      case 9: pin = FIRE_CHANNEL_9; break;
+      case 10: pin = FIRE_CHANNEL_10; break;
+      case 11: pin = FIRE_CHANNEL_11; break;
+      case 12: pin = FIRE_CHANNEL_12; break;
+    }
+    pulseButton(pin, channelDelay);
+  }
+
+  // Rapid All Fire test
   Serial.println("Testing RAPID_ALL_FIRE");
-  digitalWrite(RAPID_ALL_FIRE, LOW); delay(testDelay); digitalWrite(RAPID_ALL_FIRE, HIGH);
-  Serial.println("Testing AREA_MODULATION_UP");
-  digitalWrite(AREA_MODULATION_UP, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_UP, HIGH);
-  Serial.println("Testing AREA_MODULATION_DOWN");
-  digitalWrite(AREA_MODULATION_DOWN, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_DOWN, HIGH);
+  pulseButton(RAPID_ALL_FIRE, channelDelay);
+
+  delay(2000); // Wait before next loop
 }
