@@ -56,11 +56,21 @@ void setup() {
 }
 
 void loop() {
-  // To "press" a button, set the corresponding channel LOW
-  // Example: digitalWrite(FIRE_CHANNEL_1, LOW); // Press button 1
-  // digitalWrite(FIRE_CHANNEL_1, HIGH); // Release button 1
-  // To "press" Rapid All Fire: digitalWrite(RAPID_ALL_FIRE, LOW);
-  // To "press" Area Modulation Up: digitalWrite(AREA_MODULATION_UP, LOW);
-  // To "press" Area Modulation Down: digitalWrite(AREA_MODULATION_DOWN, LOW);
-  // TODO: Implement firing logic, communication, and safety checks
+  // Simulate pressing each button one at a time for testing
+  int testDelay = 500; // ms
+  digitalWrite(FIRE_CHANNEL_1, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_1, HIGH);
+  digitalWrite(FIRE_CHANNEL_2, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_2, HIGH);
+  digitalWrite(FIRE_CHANNEL_3, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_3, HIGH);
+  digitalWrite(FIRE_CHANNEL_4, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_4, HIGH);
+  digitalWrite(FIRE_CHANNEL_5, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_5, HIGH);
+  digitalWrite(FIRE_CHANNEL_6, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_6, HIGH);
+  digitalWrite(FIRE_CHANNEL_7, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_7, HIGH);
+  digitalWrite(FIRE_CHANNEL_8, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_8, HIGH);
+  digitalWrite(FIRE_CHANNEL_9, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_9, HIGH);
+  digitalWrite(FIRE_CHANNEL_10, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_10, HIGH);
+  digitalWrite(FIRE_CHANNEL_11, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_11, HIGH);
+  digitalWrite(FIRE_CHANNEL_12, LOW); delay(testDelay); digitalWrite(FIRE_CHANNEL_12, HIGH);
+  digitalWrite(RAPID_ALL_FIRE, LOW); delay(testDelay); digitalWrite(RAPID_ALL_FIRE, HIGH);
+  digitalWrite(AREA_MODULATION_UP, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_UP, HIGH);
+  digitalWrite(AREA_MODULATION_DOWN, LOW); delay(testDelay); digitalWrite(AREA_MODULATION_DOWN, HIGH);
 }
