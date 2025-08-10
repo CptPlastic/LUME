@@ -17,7 +17,8 @@
 #define FIRE_CHANNEL_11    32
 #define FIRE_CHANNEL_12    33
 #define RAPID_ALL_FIRE     4
-#define AREA_MODULATION    5
+#define AREA_MODULATION_UP    5
+#define AREA_MODULATION_DOWN  15
 
 void setup() {
   // Initialize firework channels and special buttons as outputs
@@ -34,7 +35,8 @@ void setup() {
   pinMode(FIRE_CHANNEL_11, OUTPUT);
   pinMode(FIRE_CHANNEL_12, OUTPUT);
   pinMode(RAPID_ALL_FIRE, OUTPUT);
-  pinMode(AREA_MODULATION, OUTPUT);
+  pinMode(AREA_MODULATION_UP, OUTPUT);
+  pinMode(AREA_MODULATION_DOWN, OUTPUT);
   // Set all channels and special buttons HIGH (unpressed state)
   digitalWrite(FIRE_CHANNEL_1, HIGH);
   digitalWrite(FIRE_CHANNEL_2, HIGH);
@@ -49,7 +51,8 @@ void setup() {
   digitalWrite(FIRE_CHANNEL_11, HIGH);
   digitalWrite(FIRE_CHANNEL_12, HIGH);
   digitalWrite(RAPID_ALL_FIRE, HIGH);
-  digitalWrite(AREA_MODULATION, HIGH);
+  digitalWrite(AREA_MODULATION_UP, HIGH);
+  digitalWrite(AREA_MODULATION_DOWN, HIGH);
 }
 
 void loop() {
@@ -57,6 +60,7 @@ void loop() {
   // Example: digitalWrite(FIRE_CHANNEL_1, LOW); // Press button 1
   // digitalWrite(FIRE_CHANNEL_1, HIGH); // Release button 1
   // To "press" Rapid All Fire: digitalWrite(RAPID_ALL_FIRE, LOW);
-  // To "press" Area Modulation: digitalWrite(AREA_MODULATION, LOW);
+  // To "press" Area Modulation Up: digitalWrite(AREA_MODULATION_UP, LOW);
+  // To "press" Area Modulation Down: digitalWrite(AREA_MODULATION_DOWN, LOW);
   // TODO: Implement firing logic, communication, and safety checks
 }
