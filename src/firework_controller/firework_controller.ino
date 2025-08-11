@@ -3,26 +3,27 @@
 // Date: August 2025
 // This sketch controls fire channels and buttons using INPUT_PULLUP method for 99 areas.
 
-#define FIRE_CHANNEL_1     16
-#define FIRE_CHANNEL_2     17
-#define FIRE_CHANNEL_3     18
-#define FIRE_CHANNEL_4     19
-#define FIRE_CHANNEL_5     21
-#define FIRE_CHANNEL_6     22
-#define FIRE_CHANNEL_7     23
-#define FIRE_CHANNEL_8     25
-#define FIRE_CHANNEL_9     26
-#define FIRE_CHANNEL_10    27
-#define FIRE_CHANNEL_11    32
-#define FIRE_CHANNEL_12    33
+#define FIRE_CHANNEL_1     32   // Hardware Pin 8
+#define FIRE_CHANNEL_2     33   // Hardware Pin 9
+#define FIRE_CHANNEL_3     25   // Hardware Pin 10
+#define FIRE_CHANNEL_4     26   // Hardware Pin 11
+#define FIRE_CHANNEL_5     18   // Hardware Pin 30
+#define FIRE_CHANNEL_6     14   // Hardware Pin 13
+#define FIRE_CHANNEL_7     13   // Hardware Pin 16
+#define FIRE_CHANNEL_8     27   // Hardware Pin 12 - SAFE GPIO, no boot issues
+#define FIRE_CHANNEL_9     16   // Hardware Pin 27
+#define FIRE_CHANNEL_10    17   // Hardware Pin 28
+#define FIRE_CHANNEL_11    22   // Hardware Pin 36
+#define FIRE_CHANNEL_12    19   // Hardware Pin 31
 
 // Control buttons
-#define BUTTON_AREA_UP     4
-#define BUTTON_AREA_DOWN   13
-#define BUTTON_RAPID_FIRE  14
-#define BUTTON_ALL_FIRE    2
+#define BUTTON_AREA_UP     21   // Hardware Pin 33
+#define BUTTON_AREA_DOWN   23   // Hardware Pin 37  
+#define BUTTON_RAPID_FIRE  4    // Hardware Pin 26 - Moved here from dangerous fire channel
+#define BUTTON_ALL_FIRE    2    // Hardware Pin 24
 
 // Note: GPIO 15 avoided due to boot requirements
+// GPIO 4 moved to control button due to boot firing issue
 
 const int fireChannels[12] = {
   FIRE_CHANNEL_1, FIRE_CHANNEL_2, FIRE_CHANNEL_3, FIRE_CHANNEL_4,
