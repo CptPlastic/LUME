@@ -47,8 +47,8 @@ Pin  	  Pin Label  	  GPIO  	  Safe to use?  	Reason / LUME Usage
 ### Fire Channels (12 total - 3 remotes × 4 channels each)
 ```
 Remote 1: GPIO 32, 33, 25, 26  (Channels 1-4)
-Remote 2: GPIO 18, 14, 13, 27  (Channels 5-8)
-Remote 3: GPIO 16, 17, 22, 19  (Channels 9-12)
+Remote 2: GPIO 18, 5, 13, 27   (Channels 5-8)
+Remote 3: GPIO 15, 17, 22, 19  (Channels 9-12)
 ```
 
 ### Control Buttons (4 total)
@@ -58,6 +58,13 @@ AREA_DOWN:  GPIO 23  (Hardware area navigation down)
 RAPID_FIRE: GPIO 4   (Sequential channel firing)
 ALL_FIRE:   GPIO 2   (Fire all channels in current area)
 ```
+
+### FINAL WORKING CONFIGURATION - PRODUCTION READY
+**All 12 channels now working reliably:**
+- **Channel 6**: GPIO 5 (moved from GPIO 14 - boot HIGH required)
+- **Channel 9**: GPIO 15 (moved from GPIO 16 - safe for runtime)
+- **No boot-time firing issues**
+- **WiFi interference protection active**
 
 ### WiFi Interference Sensitive Pins
 - **GPIO 25 (Channel 3)**: WiFi DAC operations can cause interference

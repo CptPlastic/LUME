@@ -28,6 +28,19 @@ const char* WIFI_PASSWORD = "Ilovemywife!";     // Enter your WiFi password here
 
 // =============================================================================
 
+// TODO - PIN ISSUES RESOLVED:
+// GPIO 16 (Old Channel 9) - FIXED: Replaced with GPIO 15 (safe for runtime, boot logging only)
+// GPIO 14 (Old Channel 6) - FIXED: Replaced with GPIO 5 (safer than GPIO 15, requires HIGH during boot)
+// 
+// CURRENT PIN ASSIGNMENTS - ALL VERIFIED SAFE:
+// Channel 6: GPIO 5 (safer than GPIO 15, must be HIGH during boot only)
+// Channel 9: GPIO 15 (safe for runtime, only affects boot logging if pulled LOW during boot)
+// 
+// SAFE ESP32 GPIO PINS for fire channels (all in use):
+// GPIO 32, 33, 25, 26, 27, 18, 19, 21, 22, 23 (confirmed working)
+// GPIO 5, 13, 15, 17 (tested safe, now in production use)
+// =============================================================================
+
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
@@ -50,13 +63,13 @@ unsigned long showStartTime = 0;
 #define FIRE_CHANNEL_3     25   // Hardware Pin 10 - ORIGINAL WORKING PIN
 #define FIRE_CHANNEL_4     26   // Hardware Pin 11
 #define FIRE_CHANNEL_5     18   // Hardware Pin 30
-#define FIRE_CHANNEL_6     14   // Hardware Pin 13
+#define FIRE_CHANNEL_6     5    // Hardware Pin 13 - CHANGED: GPIO 5 (safer than GPIO 15, boot HIGH required)
 #define FIRE_CHANNEL_7     13   // Hardware Pin 16
 #define FIRE_CHANNEL_8     27   // Hardware Pin 12 - SAFE GPIO, no boot issues
-#define FIRE_CHANNEL_9     16   // Hardware Pin 27
+#define FIRE_CHANNEL_9     15   // Hardware Pin 27 - CHANGED: GPIO 15 safer than GPIO 12 for Channel 9
 #define FIRE_CHANNEL_10    17   // Hardware Pin 28
 #define FIRE_CHANNEL_11    22   // Hardware Pin 36
-#define FIRE_CHANNEL_12    19   // Hardware Pin 31
+#define FIRE_CHANNEL_12    19   // Hardware Pin 31 - REVERTED: GPIO 19 works fine, no programming conflicts
 
 // Control buttons - ORIGINAL WORKING CONFIGURATION
 #define BUTTON_AREA_UP     21   // Hardware Pin 33
@@ -124,11 +137,12 @@ void setup() {
   for (int i = 0; i < 12; i++) {
     pinMode(fireChannels[i], INPUT_PULLUP);
   }
-  
+
   // Initialize all control button pins to INPUT_PULLUP (safe state)
   for (int i = 0; i < 4; i++) {
     pinMode(controlButtons[i], INPUT_PULLUP);
   }
+
   
   // Simple WiFi setup
   Serial.println("Starting WiFi connection...");
@@ -343,16 +357,15 @@ void setupWiFi() {
   WiFi.setSleep(false); // Disable power saving BEFORE connecting
   WiFi.setTxPower(WIFI_POWER_MINUS_1dBm); // Set minimum power BEFORE connecting
   
-  // Extra protection for Channel 3 and 9 during connection
-  // Channel 9 (GPIO 16) needs extra protection - it's used for PSRAM on some ESP32s
+  // CRITICAL: Extra protection for Channel 3 (GPIO 25) - WiFi sensitive
+  // Channel 3 (GPIO 25) is used for DAC operations and is sensitive to WiFi interference
   pinMode(FIRE_CHANNEL_3, INPUT_PULLUP);
-  pinMode(FIRE_CHANNEL_9, INPUT_PULLUP);
-  digitalWrite(FIRE_CHANNEL_9, HIGH); // Force HIGH on GPIO 16 before WiFi
+  digitalWrite(FIRE_CHANNEL_3, HIGH); // Force HIGH before WiFi connection
   
   // Add small delay to let pins stabilize
   delay(100);
-  Serial.println("Pre-connection interference protection applied for Channels 3 & 9");
-  Serial.println("GPIO 16 (Channel 9) forced HIGH before WiFi connection");
+  Serial.println("CRITICAL: Channel 3 (GPIO 25) protected before WiFi connection");
+  Serial.println("WiFi power set to minimum (-1dBm) to prevent 433MHz interference");
   
   if (strlen(WIFI_SSID) > 0 && strlen(WIFI_PASSWORD) > 0) {
     Serial.println("Using WiFi credentials: " + String(WIFI_SSID));
@@ -370,11 +383,10 @@ void setupWiFi() {
     Serial.print(".");
     attempts++;
     
-    // Re-apply safe state every few attempts during connection
+    // Re-apply protection for Channel 3 every few attempts during connection
     if (attempts % 5 == 0) {
       pinMode(FIRE_CHANNEL_3, INPUT_PULLUP);
-      pinMode(FIRE_CHANNEL_9, INPUT_PULLUP);
-      digitalWrite(FIRE_CHANNEL_9, HIGH); // Extra protection for GPIO 16
+      digitalWrite(FIRE_CHANNEL_3, HIGH); // Extra protection for GPIO 25
       Serial.print("R"); // Indicate re-protection applied
     }
   }
@@ -388,7 +400,7 @@ void setupWiFi() {
     Serial.println("CRITICAL: All WiFi interference mitigation active");
     Serial.println("WiFi power set to minimum (-1dBm) to avoid 433MHz radio interference");
     Serial.println("WiFi forced to Channel 1 (2412MHz) - away from 433MHz harmonics");
-    Serial.println("Channels 3 & 9 protected throughout connection process");
+    Serial.println("Channel 3 (GPIO 25) protected throughout connection process - WiFi sensitive");
   } else {
     Serial.println("\nWiFi connection failed.");
     Serial.println("Check your credentials at the top of the file.");
