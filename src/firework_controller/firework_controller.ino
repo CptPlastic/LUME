@@ -41,6 +41,7 @@ const char* buttonNames[4] = {
 
 // Area selection variables
 int currentArea = 1;
+int hardwareArea = 1; // Track the actual hardware area position
 const int maxAreas = 99; // Support for 99 areas, each with 12 fire channels (3 x 4-channel remotes)
 
 // Function to simulate button press using INPUT_PULLUP method
@@ -65,9 +66,10 @@ void setup() {
   }
   
   Serial.println("Firework Controller Ready.");
-  Serial.println("Current Area: " + String(currentArea) + " (Max: " + String(maxAreas) + ")");
+  Serial.println("Current Software Area: " + String(currentArea) + " (Max: " + String(maxAreas) + ")");
+  Serial.println("Hardware Area: " + String(hardwareArea) + " (may differ - use SYNC command to align)");
   Serial.println("Each area has 12 fire channels (3 x 4-channel remotes)");
-  Serial.println("Commands: START, STOP, CHANNEL <1-12>, BUTTON <AREA_UP/AREA_DOWN/RAPID_FIRE/ALL_FIRE>, AREA <1-99>");
+  Serial.println("Commands: START, STOP, CHANNEL <1-12>, BUTTON <AREA_UP/AREA_DOWN/RAPID_FIRE/ALL_FIRE>, AREA <1-99>, SYNC <1-99>");
 }
 
 void loop() {
@@ -99,8 +101,15 @@ void loop() {
       } else {
         Serial.println("Invalid area. Use 1-" + String(maxAreas) + ".");
       }
+    } else if (command.startsWith("SYNC ")) {
+      int area = command.substring(5).toInt();
+      if (area >= 1 && area <= maxAreas) {
+        syncHardwareArea(area);
+      } else {
+        Serial.println("Invalid area. Use 1-" + String(maxAreas) + ".");
+      }
     } else {
-      Serial.println("Unknown command. Use: START, STOP, CHANNEL <1-12>, BUTTON <AREA_UP/AREA_DOWN/RAPID_FIRE/ALL_FIRE>, AREA <1-99>");
+      Serial.println("Unknown command. Use: START, STOP, CHANNEL <1-12>, BUTTON <AREA_UP/AREA_DOWN/RAPID_FIRE/ALL_FIRE>, AREA <1-99>, SYNC <1-99>");
     }
   }
 }
@@ -134,18 +143,23 @@ void testControlButton(String buttonName) {
       Serial.print("Testing button: ");
       Serial.println(buttonName);
       
-      // Handle area navigation buttons
+      // Handle area navigation buttons - these change the hardware area selection
       if (buttonName == "AREA_UP") {
+        Serial.println("Pressing hardware AREA UP button...");
         pressButton(controlButtons[i], 500);
-        currentArea++;
-        if (currentArea > maxAreas) currentArea = 1;
-        Serial.println("Area changed to: " + String(currentArea));
+        hardwareArea++;
+        if (hardwareArea > maxAreas) hardwareArea = 1;
+        currentArea = hardwareArea; // Keep software in sync
+        Serial.println("Hardware area changed to: " + String(hardwareArea));
       } else if (buttonName == "AREA_DOWN") {
+        Serial.println("Pressing hardware AREA DOWN button...");
         pressButton(controlButtons[i], 500);
-        currentArea--;
-        if (currentArea < 1) currentArea = maxAreas;
-        Serial.println("Area changed to: " + String(currentArea));
+        hardwareArea--;
+        if (hardwareArea < 1) hardwareArea = maxAreas;
+        currentArea = hardwareArea; // Keep software in sync
+        Serial.println("Hardware area changed to: " + String(hardwareArea));
       } else {
+        // For RAPID_FIRE and ALL_FIRE, just press the button
         pressButton(controlButtons[i], 500);
       }
       
@@ -157,10 +171,52 @@ void testControlButton(String buttonName) {
 }
 
 void setArea(int area) {
+  if (area == hardwareArea) {
+    Serial.println("Already at Area " + String(hardwareArea));
+    currentArea = hardwareArea;
+    return;
+  }
+  
+  Serial.println("Changing hardware area from " + String(hardwareArea) + " to " + String(area) + "...");
+  
+  // Calculate the most efficient path (up or down)
+  int upSteps = (area - hardwareArea + maxAreas) % maxAreas;
+  int downSteps = (hardwareArea - area + maxAreas) % maxAreas;
+  
+  if (upSteps == 0) upSteps = maxAreas;
+  if (downSteps == 0) downSteps = maxAreas;
+  
+  if (upSteps <= downSteps) {
+    // Go up
+    Serial.println("Pressing AREA_UP " + String(upSteps) + " times...");
+    for (int i = 0; i < upSteps; i++) {
+      pressButton(BUTTON_AREA_UP, 200);
+      delay(300); // Wait between presses
+      Serial.print(".");
+    }
+  } else {
+    // Go down  
+    Serial.println("Pressing AREA_DOWN " + String(downSteps) + " times...");
+    for (int i = 0; i < downSteps; i++) {
+      pressButton(BUTTON_AREA_DOWN, 200);
+      delay(300); // Wait between presses
+      Serial.print(".");
+    }
+  }
+  
+  hardwareArea = area;
   currentArea = area;
-  Serial.println("Area manually set to: " + String(currentArea) + " (of " + String(maxAreas) + " total areas)");
+  Serial.println();
+  Serial.println("Hardware area set to: " + String(hardwareArea) + " (of " + String(maxAreas) + " total areas)");
   Serial.println("This area has 12 fire channels organized as 3 x 4-channel remotes");
-  Serial.println("Use AREA_UP/AREA_DOWN buttons to navigate between areas, or channels will fire in this area.");
+}
+
+void syncHardwareArea(int area) {
+  Serial.println("SYNC: Telling controller that hardware is currently at area " + String(area));
+  hardwareArea = area;
+  currentArea = area;
+  Serial.println("Hardware area tracking synchronized to: " + String(hardwareArea));
+  Serial.println("Use AREA <n> command to navigate to different areas from this position");
 }
 
 void setAllPinsSafe() {
