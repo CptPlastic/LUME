@@ -18,7 +18,7 @@ const char* SYSTEM_NAME = "LUME Firework Controller";
 // SAFETY: No captive portal - AP mode causes dangerous random channel firing!
 // To connect to WiFi, enter your network credentials below:
 
-const char* WIFI_SSID = "LODGE_IoT";         // Enter your WiFi network name here
+const char* WIFI_SSID = "LUME";         // Enter your WiFi network name here
 const char* WIFI_PASSWORD = "Ilovemywife!";     // Enter your WiFi password here
 
 // Leave blank ("") to use saved credentials from previous connections
@@ -46,6 +46,8 @@ const char* WIFI_PASSWORD = "Ilovemywife!";     // Enter your WiFi password here
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 #include <EEPROM.h>
+
+#include <ESPmDNS.h>
 
 // WiFi Configuration
 WiFiManager wifiManager;
@@ -148,11 +150,17 @@ void setup() {
   Serial.println("Starting WiFi connection...");
   setupWiFi();
   
-  // Setup API if WiFi connected
+  // Setup API and mDNS if WiFi connected
   if (WiFi.status() == WL_CONNECTED) {
+    if (MDNS.begin("lume-controller")) {
+      Serial.println("mDNS responder started: lume-controller.local");
+    } else {
+      Serial.println("Error starting mDNS responder!");
+    }
     setupAPI();
     Serial.println("WiFi connected successfully!");
     Serial.println("Web interface available at: http://" + WiFi.localIP().toString());
+    Serial.println("Or via: http://lume-controller.local/");
   } else {
     Serial.println("WiFi connection failed - using serial commands only.");
   }
@@ -376,18 +384,24 @@ void setupWiFi() {
     WiFi.begin();
   }
   
-  // Wait for connection with simple timeout
+  // Wait for connection, retrying every 15 seconds until successful
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-    
-    // Re-apply protection for Channel 3 every few attempts during connection
-    if (attempts % 5 == 0) {
-      pinMode(FIRE_CHANNEL_3, INPUT_PULLUP);
-      digitalWrite(FIRE_CHANNEL_3, HIGH); // Extra protection for GPIO 25
-      Serial.print("R"); // Indicate re-protection applied
+  while (WiFi.status() != WL_CONNECTED) {
+    for (int i = 0; i < 30; i++) { // 30 x 500ms = 15 seconds
+      delay(500);
+      Serial.print(".");
+      attempts++;
+      // Re-apply protection for Channel 3 every 5 attempts
+      if (attempts % 5 == 0) {
+        pinMode(FIRE_CHANNEL_3, INPUT_PULLUP);
+        digitalWrite(FIRE_CHANNEL_3, HIGH); // Extra protection for GPIO 25
+        Serial.print("R"); // Indicate re-protection applied
+      }
+      if (WiFi.status() == WL_CONNECTED) break;
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("\nWiFi not connected, retrying...");
+      // Optionally, you could call WiFi.disconnect() and WiFi.begin() again here
     }
   }
   
@@ -429,6 +443,12 @@ void setupAPI() {
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
     html += "<style>";
     html += "body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }";
+  // POST /test/all - Start full channel test cycle
+  server.on("/test/all", HTTP_POST, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    testAllChannels();
+    server.send(200, "application/json", "{\"success\":true,\"message\":\"Full channel test started\"}");
+  });
     html += ".container { max-width: 800px; margin: 0 auto; }";
     html += ".header { text-align: center; margin-bottom: 30px; }";
     html += ".status { background: #333; padding: 20px; border-radius: 8px; margin-bottom: 20px; }";

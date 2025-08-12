@@ -127,6 +127,17 @@ Emergency stop - immediately set all channels to safe state.
 }
 ```
 
+#### `POST /test/all`
+Start a full channel test cycle (tests all 12 fire channels in sequence).
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Full channel test started"
+}
+```
+
 ### Administrative
 
 #### `GET /`
