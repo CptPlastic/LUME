@@ -19,7 +19,7 @@ const char* SYSTEM_NAME = "LUME Firework Controller";
 // To connect to WiFi, enter your network credentials below:
 
 const char* WIFI_SSID = "LUME";         // Enter your WiFi network name here
-const char* WIFI_PASSWORD = "Ilovemywife!";     // Enter your WiFi password here
+const char* WIFI_PASSWORD = "DOXW7TBD";     // Enter your WiFi password here
 
 // Leave blank ("") to use saved credentials from previous connections
 // Example:

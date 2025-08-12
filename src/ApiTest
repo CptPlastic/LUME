@@ -1,0 +1,166 @@
+// Copyright 2025 cptplastic
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     https://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+{
+  "meta": {
+    "format": "httpie",
+    "version": "1.0.0",
+    "contentType": "collection",
+    "schema": "https://schema.httpie.io/1.0.0.json",
+    "docs": "https://httpie.io/r/help/export-from-httpie",
+    "source": "HTTPie Desktop 2025.2.0"
+  },
+  "entry": {
+    "name": "LUME",
+    "icon": {
+      "name": "flame",
+      "color": "red"
+    },
+    "auth": {
+      "type": "none"
+    },
+    "requests": [
+      {
+        "name": "Get Status",
+        "url": "http://lume-controller.local/status",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Get WiFi Info",
+        "url": "http://lume-controller.local/wifi/info",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Get Version Info",
+        "url": "http://lume-controller.local/version",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Set Area",
+        "url": "http://lume-controller.local/area?id=1",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Sync Area",
+        "url": "http://lume-controller.local/sync?id=1",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Fire Channel",
+        "url": "http://lume-controller.local/channel?id=1",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Press Button AREA_UP",
+        "url": "http://lume-controller.local/button?name=AREA_UP",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Press Button AREA_DOWN",
+        "url": "http://lume-controller.local/button?name=AREA_DOWN",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Press Button RAPID_FIRE",
+        "url": "http://lume-controller.local/button?name=RAPID_FIRE",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Press Button ALL_FIRE",
+        "url": "http://lume-controller.local/button?name=ALL_FIRE",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Emergency Stop",
+        "url": "http://lume-controller.local/emergency/stop",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "Full Channel Test",
+        "url": "http://lume-controller.local/test/all",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      },
+      {
+        "name": "WiFi Reset (Disabled)",
+        "url": "http://lume-controller.local/wifi/reset",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": { "type": "inherited" },
+        "body": { "type": "none" }
+      }
+    ]
+  }
+}
