@@ -1,6 +1,6 @@
 # 🎆 LUME Desktop Controller
 
-Professional desktop application for controlling LUME ESP32-based firework and lighting systems.
+Desktop application for controlling LUME ESP32-based firework and lighting systems.
 
 ## ✨ Features
 
