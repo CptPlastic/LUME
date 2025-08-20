@@ -1,4 +1,4 @@
-import type { FireworkType, ShowFile, ShowSequence } from '../types';
+import type { FireworkType, ShowFile, Show } from '../types';
 
 export class FireworkService {
   
@@ -118,13 +118,21 @@ export class FireworkService {
   }
 
   // Export show to JSON file
-  static exportShow(show: ShowSequence, fireworkTypes: FireworkType[], controllers: any[]): ShowFile {
+  static exportShow(show: Show, fireworkTypes: FireworkType[], controllers: any[]): ShowFile {
+    const usedFireworkTypeIds = new Set(
+      show.sequences.map(seq => seq.fireworkTypeId)
+    );
+    
     const usedFireworkTypes = fireworkTypes.filter(ft => 
-      show.steps.some(step => step.fireworkType === ft.id)
+      usedFireworkTypeIds.has(ft.id)
+    );
+
+    const usedControllerIds = new Set(
+      show.sequences.map(seq => seq.controllerId)
     );
 
     const usedControllers = controllers
-      .filter(c => show.controllers.includes(c.id))
+      .filter(c => usedControllerIds.has(c.id))
       .map(c => ({
         id: c.id,
         name: c.name,
@@ -143,17 +151,14 @@ export class FireworkService {
         modified: show.modifiedAt.toISOString(),
         tags: show.metadata?.tags
       },
-      show: {
-        ...show,
-        fireworkTypes: usedFireworkTypes
-      },
+      show,
       fireworkTypes: usedFireworkTypes,
       controllers: usedControllers
     };
   }
 
   // Import show from JSON file
-  static importShow(showFile: ShowFile): { success: boolean; errors?: string[]; show?: ShowSequence; fireworkTypes?: FireworkType[] } {
+  static importShow(showFile: ShowFile): { success: boolean; errors?: string[]; show?: Show; fireworkTypes?: FireworkType[] } {
     const errors: string[] = [];
 
     // Validate format
@@ -186,7 +191,7 @@ export class FireworkService {
     }
 
     // Convert dates back from ISO strings
-    const show: ShowSequence = {
+    const show: Show = {
       ...showFile.show,
       createdAt: new Date(showFile.metadata.created),
       modifiedAt: new Date(showFile.metadata.modified),
@@ -262,45 +267,45 @@ export class FireworkService {
   }
 
   // Validate show for safety
-  static validateShowSafety(show: ShowSequence, fireworkTypes: FireworkType[]): string[] {
+  static validateShowSafety(show: Show, fireworkTypes: FireworkType[]): string[] {
     const warnings: string[] = [];
     const fireworkMap = new Map(fireworkTypes.map(ft => [ft.id, ft]));
 
-    // Check for minimum delays between fireworks
-    for (let i = 0; i < show.steps.length - 1; i++) {
-      const currentStep = show.steps[i];
-      const nextStep = show.steps[i + 1];
+    // Sort sequences by timestamp for safety analysis
+    const sortedSequences = [...show.sequences].sort((a, b) => a.timestamp - b.timestamp);
 
-      if (currentStep.fireworkType && currentStep.action.type === 'fire_firework') {
-        const firework = fireworkMap.get(currentStep.fireworkType);
-        if (firework) {
-          const timeDiff = nextStep.time - currentStep.time;
-          if (timeDiff < firework.safetyDelay) {
-            warnings.push(
-              `Step ${i + 1}: ${firework.name} requires ${firework.safetyDelay}ms safety delay, but next step is only ${timeDiff}ms later`
-            );
-          }
+    // Check for minimum delays between fireworks
+    for (let i = 0; i < sortedSequences.length - 1; i++) {
+      const currentSeq = sortedSequences[i];
+      const nextSeq = sortedSequences[i + 1];
+
+      const firework = fireworkMap.get(currentSeq.fireworkTypeId);
+      if (firework) {
+        const timeDiff = nextSeq.timestamp - currentSeq.timestamp;
+        if (timeDiff < firework.safetyDelay) {
+          warnings.push(
+            `Sequence ${i + 1}: ${firework.name} requires ${firework.safetyDelay}ms safety delay, but next firework is only ${timeDiff}ms later`
+          );
         }
       }
     }
 
     // Check for overlapping high-intensity fireworks
-    const highIntensitySteps = show.steps.filter(step => {
-      if (!step.fireworkType) return false;
-      const firework = fireworkMap.get(step.fireworkType);
+    const highIntensitySequences = show.sequences.filter(seq => {
+      const firework = fireworkMap.get(seq.fireworkTypeId);
       return firework && (firework.intensity === 'high' || firework.intensity === 'extreme');
     });
 
-    highIntensitySteps.forEach((step) => {
-      const firework = fireworkMap.get(step.fireworkType!);
+    highIntensitySequences.forEach((sequence) => {
+      const firework = fireworkMap.get(sequence.fireworkTypeId);
       if (firework) {
-        const overlapping = highIntensitySteps.filter(other => 
-          other !== step && 
-          Math.abs(other.time - step.time) < firework.duration
+        const overlapping = highIntensitySequences.filter(other => 
+          other !== sequence && 
+          Math.abs(other.timestamp - sequence.timestamp) < firework.duration
         );
         if (overlapping.length > 0) {
           warnings.push(
-            `High-intensity firework "${firework.name}" at ${step.time}ms may overlap with other high-intensity effects`
+            `High-intensity firework "${firework.name}" at ${sequence.timestamp}ms may overlap with other high-intensity effects`
           );
         }
       }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ESP32Controller, ShowSequence, LumeStore, FireworkType, ShowFile } from '../types';
+import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile } from '../types';
 import { ESP32API, controllerDiscovery } from '../services/esp32-api';
 import { FireworkService } from '../services/firework-service';
 
@@ -8,13 +8,16 @@ interface LumeStoreImpl extends LumeStore {
   // Additional internal state
   apis: Map<string, ESP32API>;
   lastScanTime: Date | null;
+  showTimeouts: NodeJS.Timeout[];
   
-  // Enhanced actions
+  // Enhanced controller actions
   scanForControllers: () => Promise<void>;
   addManualController: (ip: string, type?: 'firework' | 'lights') => Promise<boolean>;
   connectToController: (id: string) => Promise<boolean>;
   disconnectFromController: (id: string) => void;
-  fireChannel: (controllerId: string, channel: number) => Promise<boolean>;
+  fireChannel: (controllerId: string, area: number, channel: number) => Promise<boolean>;
+  setControllerArea: (controllerId: string, area: number) => Promise<boolean>;
+  syncControllerArea: (controllerId: string, area: number) => Promise<boolean>;
   testAllChannels: (controllerId: string) => Promise<boolean>;
   emergencyStopAll: () => Promise<void>;
   
@@ -36,6 +39,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         connectionStatus: 'disconnected',
         apis: new Map(),
         lastScanTime: null,
+        showTimeouts: [],
 
         // Basic controller management
         addController: (controller: ESP32Controller) => {
@@ -151,18 +155,59 @@ export const useLumeStore = create<LumeStoreImpl>()(
           get().updateControllerStatus(id, { status: 'disconnected' });
         },
 
-        fireChannel: async (controllerId: string, channel: number): Promise<boolean> => {
+        fireChannel: async (controllerId: string, area: number, channel: number): Promise<boolean> => {
           const { apis } = get();
           const api = apis.get(controllerId);
           
           if (!api) return false;
           
           try {
+            // First ensure we're on the correct area
+            await api.setArea(area);
+            await api.syncArea(area);
+            
+            // Then fire the channel
             const result = await api.fireChannel(channel);
             return result.success;
           } catch (error) {
-            console.error(`Failed to fire channel ${channel} on controller ${controllerId}:`, error);
+            console.error(`Failed to fire area ${area} channel ${channel} on controller ${controllerId}:`, error);
             // Only mark as disconnected on network timeout/connection errors
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        setControllerArea: async (controllerId: string, area: number): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.setArea(area);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to set area ${area} on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        syncControllerArea: async (controllerId: string, area: number): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.syncArea(area);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to sync area ${area} on controller ${controllerId}:`, error);
             if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
               get().updateControllerStatus(controllerId, { status: 'disconnected' });
             }
@@ -210,25 +255,22 @@ export const useLumeStore = create<LumeStoreImpl>()(
         },
 
         // Show management
-        loadShow: (show: ShowSequence) => {
+        loadShow: (show: Show) => {
           set({ currentShow: show, isPlaying: false });
         },
 
-        saveShow: (show: ShowSequence) => {
+        saveShow: (show: Show) => {
           // In a real app, this would save to local storage or server
           console.log('Saving show:', show);
           set({ currentShow: show });
         },
 
         createShow: (name: string, description: string) => {
-          const newShow: ShowSequence = {
+          const newShow: Show = {
             id: `show-${Date.now()}`,
             name,
             description,
-            duration: 0,
-            steps: [],
-            controllers: [],
-            fireworkTypes: [],
+            sequences: [],
             createdAt: new Date(),
             modifiedAt: new Date(),
             version: '1.0.0',
@@ -242,6 +284,62 @@ export const useLumeStore = create<LumeStoreImpl>()(
           if (currentShow?.id === id) {
             set({ currentShow: null });
           }
+        },
+
+        // Show sequence management
+        addShowSequence: (sequence: Omit<ShowSequence, 'id'>) => {
+          const { currentShow } = get();
+          if (!currentShow) return;
+
+          const newSequence: ShowSequence = {
+            ...sequence,
+            id: `seq-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+          };
+
+          const updatedShow: Show = {
+            ...currentShow,
+            sequences: [...currentShow.sequences, newSequence],
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
+        },
+
+        removeShowSequence: (sequenceId: string) => {
+          console.log('🗑️ Store removeShowSequence called with ID:', sequenceId);
+          const { currentShow } = get();
+          if (!currentShow) {
+            console.log('❌ No current show to remove from');
+            return;
+          }
+
+          console.log('📊 Before removal - sequences:', currentShow.sequences.length);
+          const filteredSequences = currentShow.sequences.filter(seq => seq.id !== sequenceId);
+          console.log('📊 After filtering - sequences:', filteredSequences.length);
+
+          const updatedShow: Show = {
+            ...currentShow,
+            sequences: filteredSequences,
+            modifiedAt: new Date()
+          };
+
+          console.log('✅ Setting updated show with', updatedShow.sequences.length, 'sequences');
+          set({ currentShow: updatedShow });
+        },
+
+        updateShowSequence: (sequenceId: string, updates: Partial<ShowSequence>) => {
+          const { currentShow } = get();
+          if (!currentShow) return;
+
+          const updatedShow: Show = {
+            ...currentShow,
+            sequences: currentShow.sequences.map(seq => 
+              seq.id === sequenceId ? { ...seq, ...updates } : seq
+            ),
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
         },
 
         // Firework type management
@@ -288,12 +386,62 @@ export const useLumeStore = create<LumeStoreImpl>()(
         },
 
         playShow: () => {
-          set({ isPlaying: true });
-          // Show playback logic would go here
+          const { currentShow } = get();
+          if (!currentShow || currentShow.sequences.length === 0) {
+            console.warn('No show or sequences to play');
+            return;
+          }
+
+          // Clear any existing timeouts
+          get().showTimeouts.forEach(timeout => clearTimeout(timeout));
+          set({ isPlaying: true, showTimeouts: [] });
+
+          console.log(`🎬 Starting show "${currentShow.name}" with ${currentShow.sequences.length} sequences`);
+
+          // Sort sequences by timestamp
+          const sortedSequences = [...currentShow.sequences].sort((a, b) => a.timestamp - b.timestamp);
+
+          sortedSequences.forEach((sequence) => {
+            const delay = sequence.timestamp; // Already in milliseconds
+            
+            const timeout = setTimeout(async () => {
+              console.log(`🎆 Firing sequence: ${sequence.fireworkType?.name} on ${sequence.controllerId} Area ${sequence.area} Channel ${sequence.channel}`);
+              
+              try {
+                const success = await get().fireChannel(sequence.controllerId, sequence.area, sequence.channel);
+                if (success) {
+                  console.log(`✅ Successfully fired ${sequence.fireworkType?.name}`);
+                } else {
+                  console.error(`❌ Failed to fire ${sequence.fireworkType?.name}`);
+                }
+              } catch (error) {
+                console.error(`💥 Error firing ${sequence.fireworkType?.name}:`, error);
+              }
+            }, delay);
+
+            // Store timeout for cleanup
+            get().showTimeouts.push(timeout);
+          });
+
+          // Auto-stop when show is complete
+          const showDuration = Math.max(...sortedSequences.map(s => s.timestamp)) + 5000; // Add 5 seconds buffer
+          const stopTimeout = setTimeout(() => {
+            console.log('🎬 Show completed');
+            get().stopShow();
+          }, showDuration);
+          
+          get().showTimeouts.push(stopTimeout);
         },
 
         stopShow: () => {
-          set({ isPlaying: false });
+          console.log('🛑 Stopping show');
+          
+          // Clear all timeouts
+          get().showTimeouts.forEach(timeout => clearTimeout(timeout));
+          set({ isPlaying: false, showTimeouts: [] });
+
+          // Emergency stop all controllers as safety measure
+          get().emergencyStopAll();
         },
       }),
       {

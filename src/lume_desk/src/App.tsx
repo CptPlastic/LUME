@@ -3,8 +3,9 @@ import './index.css';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { FireworkTypeManager } from './components/FireworkTypeManager';
+import { ShowBuilder } from './components/ShowBuilder';
 
-type ViewType = 'dashboard' | 'firework-types';
+type ViewType = 'dashboard' | 'firework-types' | 'show-builder';
 
 function App() {
   console.log('🚀 App component rendering - Full LUME App');
@@ -20,6 +21,14 @@ function App() {
           <div className="flex-1 p-6 bg-gray-900">
             <div className="max-w-7xl mx-auto">
               <FireworkTypeManager />
+            </div>
+          </div>
+        );
+      case 'show-builder':
+        return (
+          <div className="flex-1 p-6 bg-gray-900">
+            <div className="max-w-7xl mx-auto">
+              <ShowBuilder />
             </div>
           </div>
         );

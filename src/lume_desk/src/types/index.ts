@@ -11,12 +11,15 @@ export interface ESP32Controller {
 export interface FireworkController extends ESP32Controller {
   type: 'firework';
   currentArea: number;
+  maxAreas: number; // Usually 99
+  channelsPerArea: number; // Usually 12
   channels: ChannelStatus[];
   safetyStatus: SafetyStatus;
 }
 
 export interface ChannelStatus {
   id: number;
+  area: number; // Which area this channel belongs to
   name: string;
   status: 'ready' | 'fired' | 'error';
   lastFired?: Date;
@@ -63,14 +66,11 @@ export interface FireworkType {
 }
 
 // Enhanced Show sequencing types
-export interface ShowSequence {
+export interface Show {
   id: string;
   name: string;
   description: string;
-  duration: number;
-  steps: SequenceStep[];
-  controllers: string[]; // Controller IDs
-  fireworkTypes: FireworkType[]; // Used firework types in this show
+  sequences: ShowSequence[];
   createdAt: Date;
   modifiedAt: Date;
   version: string; // for compatibility
@@ -81,6 +81,18 @@ export interface ShowSequence {
     artist?: string;
     tags?: string[];
   };
+}
+
+export interface ShowSequence {
+  id: string;
+  timestamp: number; // milliseconds from start
+  fireworkTypeId: string;
+  fireworkType?: FireworkType; // Populated for display
+  controllerId: string;
+  area: number; // Which area on the controller (1-99)
+  channel: number; // Which channel in that area (1-12)
+  delay: number; // Additional delay before firing
+  repeat: number; // How many times to repeat
 }
 
 export interface SequenceStep {
@@ -108,7 +120,7 @@ export interface ShowFile {
     modified: string;
     tags?: string[];
   };
-  show: ShowSequence;
+  show: Show;
   fireworkTypes: FireworkType[];
   controllers: {
     id: string;
@@ -122,7 +134,7 @@ export interface ShowFile {
 export interface LumeStore {
   controllers: ESP32Controller[];
   activeController: string | null;
-  currentShow: ShowSequence | null;
+  currentShow: Show | null;
   fireworkTypes: FireworkType[];
   isPlaying: boolean;
   connectionStatus: 'scanning' | 'connected' | 'disconnected';
@@ -134,10 +146,22 @@ export interface LumeStore {
   updateControllerStatus: (id: string, status: Partial<ESP32Controller>) => void;
   
   // Show management
-  loadShow: (show: ShowSequence) => void;
-  saveShow: (show: ShowSequence) => void;
+  loadShow: (show: Show) => void;
+  saveShow: (show: Show) => void;
   playShow: () => void;
   stopShow: () => void;
+  createShow: (name: string, description: string) => void;
+  deleteShow: (id: string) => void;
+  
+  // Show sequence management
+  addShowSequence: (sequence: Omit<ShowSequence, 'id'>) => void;
+  removeShowSequence: (sequenceId: string) => void;
+  updateShowSequence: (sequenceId: string, updates: Partial<ShowSequence>) => void;
+  
+  // Controller area management
+  fireChannel: (controllerId: string, area: number, channel: number) => Promise<boolean>;
+  setControllerArea: (controllerId: string, area: number) => Promise<boolean>;
+  syncControllerArea: (controllerId: string, area: number) => Promise<boolean>;
   
   // Firework type management
   addFireworkType: (fireworkType: FireworkType) => void;

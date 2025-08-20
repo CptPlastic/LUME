@@ -1,10 +1,10 @@
 import React from 'react';
-import { Zap, Wifi, WifiOff, AlertTriangle, Power, Wrench, Sparkles } from 'lucide-react';
+import { Zap, Wifi, WifiOff, AlertTriangle, Power, Wrench, Sparkles, Clapperboard } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 
 interface HeaderProps {
-  currentView: 'dashboard' | 'firework-types';
-  onViewChange: (view: 'dashboard' | 'firework-types') => void;
+  currentView: 'dashboard' | 'firework-types' | 'show-builder';
+  onViewChange: (view: 'dashboard' | 'firework-types' | 'show-builder') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => {
@@ -74,6 +74,17 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
           >
             <Sparkles className="w-4 h-4" />
             <span>Firework Types</span>
+          </button>
+          <button
+            onClick={() => onViewChange('show-builder')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+              currentView === 'show-builder'
+                ? 'bg-lume-primary text-white'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <Clapperboard className="w-4 h-4" />
+            <span>Show Builder</span>
           </button>
         </nav>
 

@@ -23,12 +23,16 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
     connectToController,
     disconnectFromController,
     fireChannel,
+    setControllerArea,
+    syncControllerArea,
     testAllChannels
   } = useLumeStore();
   
   const [isConnecting, setIsConnecting] = useState(false);
   const [testingChannel, setTestingChannel] = useState<number | null>(null);
   const [testingAll, setTestingAll] = useState(false);
+  const [currentArea, setCurrentArea] = useState(1);
+  const [newAreaInput, setNewAreaInput] = useState('');
 
   const isActive = activeController === controller.id;
   const isConnected = controller.status === 'connected';
@@ -87,7 +91,7 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
     
     setTestingChannel(channel);
     try {
-      await fireChannel(controller.id, channel);
+      await fireChannel(controller.id, currentArea, channel);
     } catch (error) {
       console.error('Failed to test channel:', error);
     } finally {
@@ -105,6 +109,31 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
       console.error('Failed to test all channels:', error);
     } finally {
       setTimeout(() => setTestingAll(false), 5000); // Reset after 5 seconds (test cycle time)
+    }
+  };
+
+  const handleChangeArea = async () => {
+    if (!isConnected || !newAreaInput) return;
+    
+    const area = parseInt(newAreaInput);
+    if (area < 1 || area > 99) {
+      alert('Area must be between 1 and 99');
+      return;
+    }
+    
+    try {
+      const success = await setControllerArea(controller.id, area);
+      if (success) {
+        await syncControllerArea(controller.id, area);
+        setCurrentArea(area);
+        setNewAreaInput('');
+        console.log(`Changed controller ${controller.id} to area ${area}`);
+      } else {
+        alert('Failed to change area');
+      }
+    } catch (error) {
+      console.error('Failed to change area:', error);
+      alert('Failed to change area');
     }
   };
 
@@ -148,9 +177,11 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
         {/* Controller Type Badge */}
         <div className="flex items-center space-x-2 mb-4">
           <span className={`px-2 py-1 rounded text-xs font-medium ${
-            controller.type === 'firework' ? 'bg-lume-primary text-white' :
-            controller.type === 'lights' ? 'bg-lume-accent text-black' :
-            'bg-gray-600 text-white'
+            (() => {
+              if (controller.type === 'firework') return 'bg-lume-primary text-white';
+              if (controller.type === 'lights') return 'bg-lume-accent text-black';
+              return 'bg-gray-600 text-white';
+            })()
           }`}>
             {controller.type.toUpperCase()}
           </span>
@@ -178,11 +209,40 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
           })()}
         </div>
 
+        {/* Area Management (for firework controllers) */}
+        {controller.type === 'firework' && isConnected && (
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-gray-300 mb-2">Area Control</h4>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-400">Current Area:</span>
+              <span className="text-lume-primary font-mono font-bold">{currentArea}</span>
+              <div className="flex-1 flex items-center space-x-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={newAreaInput}
+                  onChange={(e) => setNewAreaInput(e.target.value)}
+                  placeholder="1-99"
+                  className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:ring-1 focus:ring-lume-primary focus:border-transparent"
+                />
+                <button
+                  onClick={handleChangeArea}
+                  disabled={!newAreaInput || isConnecting}
+                  className="px-2 py-1 text-xs font-medium bg-lume-secondary hover:bg-blue-700 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Set Area
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Test Channels (for firework controllers) */}
         {controller.type === 'firework' && isConnected && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-300">Quick Test</h4>
+              <h4 className="text-sm font-medium text-gray-300">Area {currentArea} Channels (1-12)</h4>
               <button
                 onClick={handleTestAll}
                 disabled={testingChannel !== null || testingAll}
