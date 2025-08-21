@@ -1,15 +1,15 @@
 <div align="center">
 
-# 🎆 LUME Firework Controller System
+# 🎆 LUME Professional Display Control System
 
 [![Version](https://img.shields.io/badge/version-v1.2.0--beta-blue.svg)](VERSION.md)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Platform](https://img.shields.io/badge/platform-ESP32-orange.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
-**Professional Wireless Firework Display Control System**
+**Professional Wireless Firework & Lighting Display Control System**
 
-*Safe • Reliable • Remote*
+*Safe • Reliable • Remote • Synchronized*
 
 </div>
 
@@ -17,20 +17,42 @@
 
 ## 🌟 Overview
 
-LUME is a cutting-edge firework display control system built on ESP32 technology, offering professional-grade wireless control for complex pyrotechnic displays. Designed with safety as the top priority, LUME provides reliable remote operation through WiFi connectivity and comprehensive interference protection.
+LUME is a cutting-edge display control system built on ESP32 technology, offering professional-grade wireless control for complex pyrotechnic and lighting displays. Designed with safety as the top priority, LUME provides reliable remote operation through WiFi connectivity and comprehensive interference protection.
 
 ### ✨ Key Features
 
-- 🎯 **12-Channel Control** - Full support for 12 independent fire channels  
+- 🎯 **12-Channel Control** - Full support for 12 independent channels per controller
 - 🌐 **WiFi Remote Access** - Web-based control interface  
 - 🛡️ **Safety Systems** - Multiple interference protection layers  
 - 📡 **433MHz Compatible** - Engineered for radio frequency environments  
 - ⚡ **Real-Time Control** - Instant response and status monitoring  
 - 🎪 **99 Areas Support** - Organize complex multi-area displays
+- 💡 **Dual Control Types** - Firework channels + Lighting effects
+- 🎭 **Synchronized Shows** - Coordinate fireworks and lighting together
+
+## 🎮 Controller Types
+
+### 🎆 Firework Controller
+
+Professional pyrotechnic control with BL-1200 radio integration:
+
+- 12 fire channels per area (3 × 4-channel remotes)
+- INPUT_PULLUP button simulation
+- 433MHz interference protection
+- Emergency stop systems
+
+### 💡 Lighting Controller
+
+Professional lighting control with relay switching:
+
+- 12 relay channels per area
+- Multiple lighting effects (Solid, Strobe, Chase, Fade, Random)
+- Brightness control
+- Real-time effect management
 
 ## 🔧 System Architecture
 
-```
+```text
 ┌─────────────────┐    WiFi     ┌─────────────────┐    433MHz    ┌─────────────────┐
 │   Web Browser   │◄──────────►│   ESP32 WROOM   │◄───────────►│  BL-1200 Remote │
 │  Control Panel  │             │   Controller    │              │  Fire Channels  │
@@ -107,6 +129,63 @@ AREA_UP:    GPIO 21  (Navigate between areas)
 AREA_DOWN:  GPIO 23  (Navigate between areas)
 RAPID_FIRE: GPIO 4   (Quick sequential firing)
 ALL_FIRE:   GPIO 2   (Fire all channels in area)
+```
+
+## 💡 Lighting Controller Configuration
+
+### Relay Channels (12 total)
+
+```text
+Relay 1:  GPIO 32  (Zone 1) ✅ Working
+Relay 2:  GPIO 33  (Zone 2) ✅ Working 
+Relay 3:  GPIO 14  (Zone 3) ✅ Working (FIXED - no WiFi sensitivity)
+Relay 4:  GPIO 26  (Zone 4) ✅ Working
+Relay 5:  GPIO 18  (Zone 5) ✅ Working
+Relay 6:  GPIO 5   (Zone 6) ✅ Working
+Relay 7:  GPIO 13  (Zone 7) ✅ Working
+Relay 8:  GPIO 27  (Zone 8) ✅ Working
+Relay 9:  GPIO 15  (Zone 9) ✅ Working
+Relay 10: GPIO 17  (Zone 10) ✅ Working
+Relay 11: GPIO 22  (Zone 11) ✅ Working
+Relay 12: GPIO 19  (Zone 12) ✅ Working
+```
+
+### Status LEDs
+
+```text
+RED LED:   GPIO 21  (Effect running indicator)
+GREEN LED: GPIO 23  (Safe/ready indicator)
+```
+
+### Lighting Effects
+
+- **SOLID**: All lights on constantly
+- **STROBE**: All lights flash in unison
+- **CHASE**: Lights activate in sequence 1→12
+- **FADE**: Simulated fade using timed relay patterns
+- **RANDOM**: Random relay activation patterns
+
+### Lighting API Endpoints
+
+- `GET /` - Lighting web interface
+- `GET /status` - Controller status with relay states
+- `POST /area?id=N` - Set lighting area (1-99)
+- `POST /relay?id=N&state=ON/OFF` - Control individual relay
+- `POST /relay/toggle?id=N` - Toggle relay state
+- `POST /all?state=ON/OFF` - Control all relays
+- `POST /effect?type=TYPE&interval=MS` - Start lighting effect
+- `POST /effect/stop` - Stop current effect
+- `POST /emergency/stop` - Emergency all-off
+
+### Lighting Serial Commands
+
+```text
+RELAY <1-12> <ON/OFF>  - Control individual relay
+ALL <ON/OFF>           - Control all relays
+EFFECT <TYPE>          - Start effect (SOLID/STROBE/CHASE/FADE/RANDOM)
+STOP                   - Stop current effect
+AREA <1-99>           - Set lighting area
+STATUS                - Show lighting system status
 ```
 
 ## 🛡️ WiFi Interference Protection
