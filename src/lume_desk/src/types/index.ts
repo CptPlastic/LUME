@@ -99,12 +99,29 @@ export interface FireworkType {
   channelCount?: number; // for multi-channel fireworks
 }
 
-// Enhanced Show sequencing types
+// Lighting Effect Type System (similar to FireworkType)
+export interface LightingEffectType {
+  id: string;
+  name: string;
+  category: 'mood' | 'party' | 'strobe' | 'chase' | 'fade' | 'pattern' | 'special';
+  duration: number; // milliseconds - how long the effect runs
+  intensity: 'low' | 'medium' | 'high' | 'extreme';
+  effectType: 'solid' | 'strobe' | 'chase' | 'fade' | 'random' | 'custom';
+  colors: string[]; // hex colors or names for visual representation
+  interval?: number; // milliseconds - for effects like strobe/chase
+  pattern?: number[]; // relay pattern for custom effects [1,2,3] = activate relays 1,2,3
+  description?: string;
+  tags?: string[]; // for searching/filtering
+  relayCount?: number; // how many relays this effect uses (1-12)
+}
+
+// Enhanced Show sequencing types to support lighting
 export interface Show {
   id: string;
   name: string;
   description: string;
   sequences: ShowSequence[];
+  lightingSequences: LightingShowSequence[]; // New lighting sequences
   createdAt: Date;
   modifiedAt: Date;
   version: string; // for compatibility
@@ -117,15 +134,41 @@ export interface Show {
   };
 }
 
+export interface LightingShowSequence {
+  id: string;
+  timestamp: number; // milliseconds from start
+  lightingEffectTypeId: string;
+  lightingEffectType?: LightingEffectType; // Populated for display
+  controllerId: string;
+  area: number; // Which area on the controller (1-99)
+  relays: number[]; // Which relays to use [1,2,3] or [] for all
+  duration: number; // How long to run this effect (can override effectType duration)
+  intensity?: number; // Override default intensity (0-100)
+  repeat: number; // How many times to repeat
+}
+
+// Enhanced Show sequence to include lighting
 export interface ShowSequence {
   id: string;
   timestamp: number; // milliseconds from start
-  fireworkTypeId: string;
+  type: 'firework' | 'lighting'; // New type field
+  
+  // Firework fields (when type === 'firework')
+  fireworkTypeId?: string;
   fireworkType?: FireworkType; // Populated for display
+  channel?: number; // Which channel in that area (1-12)
+  delay?: number; // Additional delay before firing
+  
+  // Lighting fields (when type === 'lighting')
+  lightingEffectTypeId?: string;
+  lightingEffectType?: LightingEffectType; // Populated for display
+  relays?: number[]; // Which relays to use
+  duration?: number; // How long to run
+  intensity?: number; // Override intensity
+  
+  // Common fields
   controllerId: string;
   area: number; // Which area on the controller (1-99)
-  channel: number; // Which channel in that area (1-12)
-  delay: number; // Additional delay before firing
   repeat: number; // How many times to repeat
 }
 
@@ -170,6 +213,7 @@ export interface LumeStore {
   activeController: string | null;
   currentShow: Show | null;
   fireworkTypes: FireworkType[];
+  lightingEffectTypes: LightingEffectType[]; // New lighting effect types
   isPlaying: boolean;
   connectionStatus: 'scanning' | 'connected' | 'disconnected';
   
@@ -201,6 +245,11 @@ export interface LumeStore {
   addFireworkType: (fireworkType: FireworkType) => void;
   updateFireworkType: (id: string, updates: Partial<FireworkType>) => void;
   removeFireworkType: (id: string) => void;
+  
+  // Lighting effect type management
+  addLightingEffectType: (effectType: LightingEffectType) => void;
+  updateLightingEffectType: (id: string, updates: Partial<LightingEffectType>) => void;
+  removeLightingEffectType: (id: string) => void;
   
   // Import/Export
   exportShow: (showId: string) => ShowFile;

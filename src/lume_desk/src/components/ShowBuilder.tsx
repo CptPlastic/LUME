@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Play, Pause, Trash2, Settings, Clock } from 'lucide-react';
+import { Plus, Play, Pause, Trash2, Settings, Clock, Lightbulb, Zap } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
-import type { ShowSequence, FireworkType } from '../types';
+import type { ShowSequence, FireworkType, LightingEffectType } from '../types';
 import { FireworkTypeCard } from './FireworkTypeCard';
+import { LightingEffectTypeCard } from './LightingEffectTypeCard';
 
 export const ShowBuilder: React.FC = () => {
   const { 
     controllers,
     fireworkTypes, 
+    lightingEffectTypes,
     currentShow, 
     createShow, 
     addShowSequence, 
@@ -17,13 +19,16 @@ export const ShowBuilder: React.FC = () => {
     stopShow
   } = useLumeStore();
 
-  const [showName, setShowName] = useState('New Firework Show');
+  const [showName, setShowName] = useState('New Show');
   const [showDescription, setShowDescription] = useState('');
   const [selectedFireworkType, setSelectedFireworkType] = useState<FireworkType | null>(null);
+  const [selectedLightingEffect, setSelectedLightingEffect] = useState<LightingEffectType | null>(null);
+  const [effectTab, setEffectTab] = useState<'fireworks' | 'lighting'>('fireworks');
   const [sequenceTime, setSequenceTime] = useState(0);
   const [selectedController, setSelectedController] = useState('');
   const [selectedArea, setSelectedArea] = useState(1);
   const [selectedChannel, setSelectedChannel] = useState(1);
+  const [effectDuration, setEffectDuration] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,21 +37,29 @@ export const ShowBuilder: React.FC = () => {
   // Calculate show duration and statistics
   const showStats = useMemo(() => {
     if (!currentShow?.sequences) {
-      return { duration: 0, totalFireworks: 0, controllers: new Set(), channels: new Set() };
+      return { duration: 0, totalFireworks: 0, totalLighting: 0, controllers: new Set(), channels: new Set() };
     }
 
     const sequences = currentShow.sequences;
     const maxTime = sequences.reduce((max, seq) => {
-      const endTime = seq.timestamp + (seq.fireworkType?.duration || 0);
+      let endTime = seq.timestamp;
+      if (seq.type === 'firework' && seq.fireworkType) {
+        endTime += seq.fireworkType.duration;
+      } else if (seq.type === 'lighting' && seq.lightingEffectType) {
+        endTime += seq.lightingEffectType.duration * 1000; // Convert to milliseconds
+      }
       return Math.max(max, endTime);
     }, 0);
 
     const controllers = new Set(sequences.map(seq => seq.controllerId));
     const channels = new Set(sequences.map(seq => seq.channel));
+    const fireworkCount = sequences.filter(seq => seq.type === 'firework').length;
+    const lightingCount = sequences.filter(seq => seq.type === 'lighting').length;
 
     return {
       duration: maxTime,
-      totalFireworks: sequences.length,
+      totalFireworks: fireworkCount,
+      totalLighting: lightingCount,
       controllers,
       channels
     };
@@ -66,7 +79,24 @@ export const ShowBuilder: React.FC = () => {
     });
   }, [fireworkTypes, searchTerm, filterCategory]);
 
-  const categories = ['shell', 'cake', 'fountain', 'roman-candle', 'mine', 'comet', 'strobe', 'sparkler', 'smoke'];
+  // Filter lighting effect types
+  const filteredLightingEffects = useMemo(() => {
+    return lightingEffectTypes.filter(le => {
+      const matchesSearch = !searchTerm || 
+        le.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (le.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (le.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesCategory = !filterCategory || le.category === filterCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [lightingEffectTypes, searchTerm, filterCategory]);
+
+  const fireworkCategories = ['shell', 'cake', 'fountain', 'roman-candle', 'mine', 'comet', 'strobe', 'sparkler', 'smoke'];
+  const lightingCategories = ['mood', 'party', 'strobe', 'chase', 'fade', 'pattern', 'special'];
+
+  const getCurrentCategories = () => effectTab === 'fireworks' ? fireworkCategories : lightingCategories;
 
   const handleCreateShow = () => {
     console.log('🎬 Create show clicked:', { showName, showDescription });
@@ -84,7 +114,9 @@ export const ShowBuilder: React.FC = () => {
 
   const handleAddToShow = () => {
     console.log('➕ Add to show clicked:', {
+      effectTab,
       selectedFireworkType: selectedFireworkType?.name,
+      selectedLightingEffect: selectedLightingEffect?.name,
       currentShow: currentShow?.name,
       selectedController,
       selectedArea,
@@ -92,40 +124,78 @@ export const ShowBuilder: React.FC = () => {
       sequenceTime
     });
 
-    if (!selectedFireworkType) {
-      alert('Please select a firework type');
-      return;
+    if (effectTab === 'fireworks') {
+      if (!selectedFireworkType) {
+        alert('Please select a firework type');
+        return;
+      }
+
+      if (!currentShow) {
+        alert('Please create a show first');
+        return;
+      }
+
+      if (!selectedController) {
+        alert('Please select a controller');
+        return;
+      }
+
+      const sequence: Omit<ShowSequence, 'id'> = {
+        type: 'firework',
+        timestamp: sequenceTime * 1000, // Convert to milliseconds
+        fireworkTypeId: selectedFireworkType.id,
+        fireworkType: selectedFireworkType,
+        controllerId: selectedController,
+        area: selectedArea,
+        channel: selectedChannel,
+        delay: 0,
+        repeat: 1
+      };
+
+      console.log('✅ Adding firework sequence:', sequence);
+      addShowSequence(sequence);
+      
+      // Auto-increment time by safety delay + duration for next firework
+      const nextTime = sequenceTime + (selectedFireworkType.duration / 1000) + (selectedFireworkType.safetyDelay / 1000);
+      setSequenceTime(Math.round(nextTime * 10) / 10); // Round to 1 decimal
+      console.log('⏰ Auto-incremented time to:', nextTime);
+    } else if (effectTab === 'lighting') {
+      if (!selectedLightingEffect) {
+        alert('Please select a lighting effect');
+        return;
+      }
+
+      if (!currentShow) {
+        alert('Please create a show first');
+        return;
+      }
+
+      if (!selectedController) {
+        alert('Please select a controller');
+        return;
+      }
+
+      const sequence: Omit<ShowSequence, 'id'> = {
+        type: 'lighting',
+        timestamp: sequenceTime * 1000, // Convert to milliseconds
+        lightingEffectTypeId: selectedLightingEffect.id,
+        lightingEffectType: selectedLightingEffect,
+        controllerId: selectedController,
+        area: selectedArea,
+        channel: selectedChannel,
+        duration: effectDuration * 1000, // Convert to milliseconds
+        delay: 0,
+        repeat: 1
+      };
+
+      console.log('✅ Adding lighting sequence:', sequence);
+      addShowSequence(sequence);
+      
+      // Auto-increment time by effect duration for next effect
+      const nextTime = sequenceTime + effectDuration + 1; // Add 1 second gap
+      setSequenceTime(Math.round(nextTime * 10) / 10); // Round to 1 decimal
+      console.log('⏰ Auto-incremented time to:', nextTime);
     }
-
-    if (!currentShow) {
-      alert('Please create a show first');
-      return;
-    }
-
-    if (!selectedController) {
-      alert('Please select a controller');
-      return;
-    }
-
-    const sequence: Omit<ShowSequence, 'id'> = {
-      timestamp: sequenceTime * 1000, // Convert to milliseconds
-      fireworkTypeId: selectedFireworkType.id,
-      fireworkType: selectedFireworkType,
-      controllerId: selectedController,
-      area: selectedArea,
-      channel: selectedChannel,
-      delay: 0,
-      repeat: 1
-    };
-
-    console.log('✅ Adding sequence:', sequence);
-    addShowSequence(sequence);
-    console.log('📊 Current show after adding:', currentShow?.sequences.length, 'sequences');
-    
-    // Auto-increment time by safety delay + duration for next firework
-    const nextTime = sequenceTime + (selectedFireworkType.duration / 1000) + (selectedFireworkType.safetyDelay / 1000);
-    setSequenceTime(Math.round(nextTime * 10) / 10); // Round to 1 decimal
-    console.log('⏰ Auto-incremented time to:', nextTime);
   };
 
   const handleRemoveSequence = (sequenceId: string) => {
@@ -166,7 +236,7 @@ export const ShowBuilder: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-white">Show Builder</h1>
           <p className="text-gray-400 mt-1">
-            Create timed firework sequences using your firework type library
+            Create timed sequences using your firework and lighting effect libraries
           </p>
         </div>
         
@@ -235,6 +305,8 @@ export const ShowBuilder: React.FC = () => {
               <span className="text-green-300">•</span>
               <span className="text-green-200">{showStats.totalFireworks} fireworks</span>
               <span className="text-green-300">•</span>
+              <span className="text-green-200">{showStats.totalLighting} lighting</span>
+              <span className="text-green-300">•</span>
               <span className="text-green-200">{formatTime(showStats.duration)} duration</span>
             </div>
           )}
@@ -242,16 +314,52 @@ export const ShowBuilder: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Firework Type Selection */}
+        {/* Effect Type Selection */}
         <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Add Fireworks</h2>
+          {/* Tab Header */}
+          <div className="flex items-center space-x-4 mb-6">
+            <button
+              onClick={() => {
+                setEffectTab('fireworks');
+                setFilterCategory('');
+                setSearchTerm('');
+              }}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                effectTab === 'fireworks'
+                  ? 'bg-lume-primary text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span>Fireworks</span>
+            </button>
+            <button
+              onClick={() => {
+                setEffectTab('lighting');
+                setFilterCategory('');
+                setSearchTerm('');
+              }}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                effectTab === 'lighting'
+                  ? 'bg-lume-primary text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+              }`}
+            >
+              <Lightbulb className="w-4 h-4" />
+              <span>Lighting</span>
+            </button>
+          </div>
+
+          <h2 className="text-xl font-semibold text-white mb-4">
+            Add {effectTab === 'fireworks' ? 'Fireworks' : 'Lighting Effects'}
+          </h2>
           
-          {/* Firework Type Filters */}
+          {/* Effect Type Filters */}
           <div className="space-y-4 mb-6">
             <div className="flex items-center space-x-4">
               <input
                 type="text"
-                placeholder="Search firework types..."
+                placeholder={`Search ${effectTab}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
@@ -273,7 +381,7 @@ export const ShowBuilder: React.FC = () => {
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
               >
                 <option value="">All Categories</option>
-                {categories.map(category => (
+                {getCurrentCategories().map(category => (
                   <option key={category} value={category}>
                     {category.charAt(0).toUpperCase() + category.slice(1).replace('-', ' ')}
                   </option>
@@ -282,9 +390,9 @@ export const ShowBuilder: React.FC = () => {
             )}
           </div>
 
-          {/* Firework Types Grid */}
+          {/* Content Grid */}
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredFireworkTypes.map((fireworkType) => (
+            {effectTab === 'fireworks' && filteredFireworkTypes.map((fireworkType) => (
               <button
                 key={fireworkType.id}
                 type="button"
@@ -296,6 +404,7 @@ export const ShowBuilder: React.FC = () => {
                 onClick={() => {
                   console.log('🎆 Firework selected:', fireworkType.name);
                   setSelectedFireworkType(fireworkType);
+                  setSelectedLightingEffect(null);
                 }}
               >
                 <FireworkTypeCard
@@ -308,12 +417,40 @@ export const ShowBuilder: React.FC = () => {
                 />
               </button>
             ))}
+
+            {effectTab === 'lighting' && filteredLightingEffects.map((lightingEffect) => (
+              <button
+                key={lightingEffect.id}
+                type="button"
+                className={`w-full text-left cursor-pointer rounded-lg border-2 transition-colors ${
+                  selectedLightingEffect?.id === lightingEffect.id
+                    ? 'border-lume-primary bg-gray-700'
+                    : 'border-gray-600 hover:border-gray-500 bg-gray-750'
+                }`}
+                onClick={() => {
+                  console.log('💡 Lighting effect selected:', lightingEffect.name);
+                  setSelectedLightingEffect(lightingEffect);
+                  setSelectedFireworkType(null);
+                }}
+              >
+                <LightingEffectTypeCard
+                  lightingEffectType={lightingEffect}
+                  onEdit={() => {}} // Disabled in show builder
+                  onDelete={() => {}} // Disabled in show builder
+                  onSelect={() => setSelectedLightingEffect(lightingEffect)}
+                  isSelected={selectedLightingEffect?.id === lightingEffect.id}
+                  showActions={false}
+                />
+              </button>
+            ))}
           </div>
 
           {/* Add to Show Controls */}
-          {selectedFireworkType && (
+          {(selectedFireworkType || selectedLightingEffect) && (
             <div className="mt-6 p-4 bg-gray-700 rounded-lg space-y-4">
-              <h3 className="font-medium text-white">Add "{selectedFireworkType.name}" to Show</h3>
+              <h3 className="font-medium text-white">
+                Add "{selectedFireworkType?.name || selectedLightingEffect?.name}" to Show
+              </h3>
               
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -361,6 +498,23 @@ export const ShowBuilder: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {effectTab === 'lighting' && (
+                <div>
+                  <label htmlFor="effect-duration" className="block text-sm font-medium text-gray-300 mb-2">
+                    Duration (seconds)
+                  </label>
+                  <input
+                    id="effect-duration"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={effectDuration}
+                    onChange={(e) => setEffectDuration(parseFloat(e.target.value) || 5)}
+                    className="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+                  />
+                </div>
+              )}
 
               <div>
                 <label htmlFor="controller-select" className="block text-sm font-medium text-gray-300 mb-2">
@@ -414,7 +568,7 @@ export const ShowBuilder: React.FC = () => {
             <div className="text-center py-12">
               <Plus className="w-12 h-12 text-gray-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-300 mb-2">Empty Show</h3>
-              <p className="text-gray-500">Add fireworks to your show to see the timeline.</p>
+              <p className="text-gray-500">Add fireworks and lighting effects to your show to see the timeline.</p>
             </div>
           )}
 
@@ -435,14 +589,27 @@ export const ShowBuilder: React.FC = () => {
                         <div className="text-sm font-mono text-lume-primary">
                           {formatTime(sequence.timestamp)}
                         </div>
-                        <div className="text-white font-medium">
-                          {sequence.fireworkType?.name || 'Unknown Firework'}
+                        <div className="flex items-center space-x-2">
+                          {sequence.type === 'firework' ? (
+                            <Zap className="w-4 h-4 text-orange-400" />
+                          ) : (
+                            <Lightbulb className="w-4 h-4 text-blue-400" />
+                          )}
+                          <div className="text-white font-medium">
+                            {sequence.type === 'firework' 
+                              ? sequence.fireworkType?.name || 'Unknown Firework'
+                              : sequence.lightingEffectType?.name || 'Unknown Effect'
+                            }
+                          </div>
                         </div>
                       </div>
                       <div className="text-sm text-gray-400 mt-1">
                         {sequence.controllerId} • Area {sequence.area} • Channel {sequence.channel}
-                        {sequence.fireworkType && (
+                        {sequence.type === 'firework' && sequence.fireworkType && (
                           <span> • {formatTime(sequence.fireworkType.duration)}</span>
+                        )}
+                        {sequence.type === 'lighting' && sequence.duration && (
+                          <span> • {formatTime(sequence.duration)}</span>
                         )}
                       </div>
                     </div>
@@ -454,7 +621,7 @@ export const ShowBuilder: React.FC = () => {
                         handleRemoveSequence(sequence.id);
                       }}
                       className="p-2 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
-                      title="Remove firework from show"
+                      title={`Remove ${sequence.type} from show`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -469,9 +636,9 @@ export const ShowBuilder: React.FC = () => {
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-white mb-4">Remove Firework</h3>
+            <h3 className="text-lg font-medium text-white mb-4">Remove Effect</h3>
             <p className="text-gray-300 mb-6">
-              Are you sure you want to remove this firework from the show? This action cannot be undone.
+              Are you sure you want to remove this effect from the show? This action cannot be undone.
             </p>
             <div className="flex space-x-3">
               <button

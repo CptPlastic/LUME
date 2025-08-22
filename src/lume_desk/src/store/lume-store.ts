@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile } from '../types';
+import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile, LightingEffectType } from '../types';
 import { ESP32API, controllerDiscovery } from '../services/esp32-api';
 import { FireworkService } from '../services/firework-service';
+import { LightingEffectService } from '../services/lighting-effect-service';
 
 interface LumeStoreImpl extends LumeStore {
   // Additional internal state
@@ -42,6 +43,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         activeController: null,
         currentShow: null,
         fireworkTypes: FireworkService.getDefaultFireworkTypes(),
+        lightingEffectTypes: LightingEffectService.getDefaultLightingEffectTypes(),
         isPlaying: false,
         connectionStatus: 'disconnected',
         apis: new Map(),
@@ -369,6 +371,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
             name,
             description,
             sequences: [],
+            lightingSequences: [],
             createdAt: new Date(),
             modifiedAt: new Date(),
             version: '1.0.0',
@@ -461,6 +464,27 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }));
         },
 
+        // Lighting effect type management
+        addLightingEffectType: (effectType: LightingEffectType) => {
+          set((state) => ({
+            lightingEffectTypes: [...state.lightingEffectTypes, effectType]
+          }));
+        },
+
+        updateLightingEffectType: (id: string, updates: Partial<LightingEffectType>) => {
+          set((state) => ({
+            lightingEffectTypes: state.lightingEffectTypes.map(et => 
+              et.id === id ? { ...et, ...updates } : et
+            )
+          }));
+        },
+
+        removeLightingEffectType: (id: string) => {
+          set((state) => ({
+            lightingEffectTypes: state.lightingEffectTypes.filter(et => et.id !== id)
+          }));
+        },
+
         // Import/Export
         exportShow: (showId: string): ShowFile => {
           const { currentShow, fireworkTypes, controllers } = get();
@@ -503,17 +527,39 @@ export const useLumeStore = create<LumeStoreImpl>()(
             const delay = sequence.timestamp; // Already in milliseconds
             
             const timeout = setTimeout(async () => {
-              console.log(`🎆 Firing sequence: ${sequence.fireworkType?.name} on ${sequence.controllerId} Area ${sequence.area} Channel ${sequence.channel}`);
+              console.log(`🎆 Firing sequence: ${sequence.fireworkType?.name || sequence.lightingEffectType?.name} on ${sequence.controllerId} Area ${sequence.area}`);
               
               try {
-                const success = await get().fireChannel(sequence.controllerId, sequence.area, sequence.channel);
-                if (success) {
-                  console.log(`✅ Successfully fired ${sequence.fireworkType?.name}`);
-                } else {
-                  console.error(`❌ Failed to fire ${sequence.fireworkType?.name}`);
+                if (sequence.type === 'firework' && sequence.channel) {
+                  const success = await get().fireChannel(sequence.controllerId, sequence.area, sequence.channel);
+                  if (success) {
+                    console.log(`✅ Successfully fired ${sequence.fireworkType?.name}`);
+                  } else {
+                    console.error(`❌ Failed to fire ${sequence.fireworkType?.name}`);
+                  }
+                } else if (sequence.type === 'lighting' && sequence.lightingEffectType) {
+                  // Start lighting effect
+                  const effect = sequence.lightingEffectType.effectType.toUpperCase() as 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
+                  const success = await get().startLightingEffect(
+                    sequence.controllerId, 
+                    effect, 
+                    sequence.lightingEffectType.interval
+                  );
+                  if (success) {
+                    console.log(`✅ Successfully started lighting effect ${sequence.lightingEffectType.name}`);
+                    
+                    // Schedule stop after duration
+                    const duration = sequence.duration || sequence.lightingEffectType.duration;
+                    setTimeout(async () => {
+                      await get().stopLightingEffect(sequence.controllerId);
+                      console.log(`� Stopped lighting effect ${sequence.lightingEffectType?.name}`);
+                    }, duration);
+                  } else {
+                    console.error(`❌ Failed to start lighting effect ${sequence.lightingEffectType.name}`);
+                  }
                 }
               } catch (error) {
-                console.error(`💥 Error firing ${sequence.fireworkType?.name}:`, error);
+                console.error(`💥 Error firing sequence:`, error);
               }
             }, delay);
 
