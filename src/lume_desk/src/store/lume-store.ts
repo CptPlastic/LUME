@@ -21,6 +21,13 @@ interface LumeStoreImpl extends LumeStore {
   testAllChannels: (controllerId: string) => Promise<boolean>;
   emergencyStopAll: () => Promise<void>;
   
+  // Lighting controller actions
+  toggleRelay: (controllerId: string, relay: number) => Promise<boolean>;
+  setAllRelays: (controllerId: string, state: 'ON' | 'OFF') => Promise<boolean>;
+  startLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number) => Promise<boolean>;
+  stopLightingEffect: (controllerId: string) => Promise<boolean>;
+  getLightingStatus: (controllerId: string) => Promise<any>;
+  
   // Show management
   createShow: (name: string, description: string) => void;
   deleteShow: (id: string) => void;
@@ -252,6 +259,97 @@ export const useLumeStore = create<LumeStoreImpl>()(
 
           await Promise.all(stopPromises);
           set({ isPlaying: false });
+        },
+
+        // Lighting controller actions
+        toggleRelay: async (controllerId: string, relay: number): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.toggleRelay(relay);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to toggle relay ${relay} on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        setAllRelays: async (controllerId: string, state: 'ON' | 'OFF'): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.setAllRelays(state);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to set all relays ${state} on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        startLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.startEffect(effect, interval);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to start effect ${effect} on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        stopLightingEffect: async (controllerId: string): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.stopEffect();
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to stop effect on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        getLightingStatus: async (controllerId: string): Promise<any> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return {};
+          
+          try {
+            const status = await api.getStatus();
+            return status;
+          } catch (error) {
+            console.error(`Failed to get lighting status from controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return {};
+          }
         },
 
         // Show management

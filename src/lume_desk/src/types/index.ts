@@ -17,6 +17,32 @@ export interface FireworkController extends ESP32Controller {
   safetyStatus: SafetyStatus;
 }
 
+export interface LightingController extends ESP32Controller {
+  type: 'lights';
+  currentArea: number;
+  maxAreas: number; // Usually 99
+  relaysPerArea: number; // Usually 12
+  relays: RelayStatus[];
+  currentEffect: LightingEffect | null;
+  brightness: number; // 0-255
+}
+
+export interface RelayStatus {
+  id: number;
+  area: number; // Which area this relay belongs to
+  name: string;
+  status: 'on' | 'off' | 'error';
+  lastChanged?: Date;
+}
+
+export interface LightingEffect {
+  type: 'solid' | 'strobe' | 'chase' | 'fade' | 'random';
+  name: string;
+  running: boolean;
+  interval?: number; // milliseconds
+  startTime?: Date;
+}
+
 export interface ChannelStatus {
   id: number;
   area: number; // Which area this channel belongs to
@@ -33,14 +59,22 @@ export interface SafetyStatus {
 }
 
 export interface SystemStatus {
-  // LUME Firework Controller API response structure
-  softwareArea: number;
-  hardwareArea: number;
+  // LUME Controller API response structure (both firework and lighting)
+  // Firework controller fields
+  softwareArea?: number;
+  hardwareArea?: number;
   maxAreas: number;
-  showRunning: boolean;
-  showName: string;
+  showRunning?: boolean;
+  showName?: string;
   uptime: number;
   wifiRSSI: number;
+  
+  // Lighting controller fields
+  area?: number;
+  effectRunning?: boolean;
+  effectName?: string;
+  brightness?: number;
+  relayStates?: boolean[];
 }
 
 export interface APIResponse<T = unknown> {

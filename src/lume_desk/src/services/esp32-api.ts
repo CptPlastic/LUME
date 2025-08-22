@@ -89,6 +89,43 @@ export class ESP32API {
     return response.data;
   }
 
+  // Lighting Controller Methods
+  // Relay control
+  async setRelay(relay: number, state: 'ON' | 'OFF'): Promise<APIResponse> {
+    const response = await this.client.post(`/relay?id=${relay}&state=${state}`);
+    return response.data;
+  }
+
+  async toggleRelay(relay: number): Promise<APIResponse> {
+    const response = await this.client.post(`/relay/toggle?id=${relay}`);
+    return response.data;
+  }
+
+  async setAllRelays(state: 'ON' | 'OFF'): Promise<APIResponse> {
+    const response = await this.client.post(`/all?state=${state}`);
+    return response.data;
+  }
+
+  // Lighting effects
+  async startEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number): Promise<APIResponse> {
+    const params = new URLSearchParams({ type });
+    if (interval) {
+      params.append('interval', interval.toString());
+    }
+    const response = await this.client.post(`/effect?${params.toString()}`);
+    return response.data;
+  }
+
+  async stopEffect(): Promise<APIResponse> {
+    const response = await this.client.post('/effect/stop');
+    return response.data;
+  }
+
+  async setBrightness(brightness: number): Promise<APIResponse> {
+    const response = await this.client.post(`/brightness?level=${brightness}`);
+    return response.data;
+  }
+
   // Health check
   async ping(): Promise<boolean> {
     try {
@@ -113,7 +150,7 @@ export class ControllerDiscovery {
     // Scan for LUME-specific .local hostnames
     const lumeHostnames = [
       'lume-controller.local', // Firework controller
-      'lume-lights.local',     // Light controller
+      'lume-lighting.local',   // Lighting controller (matches mDNS name)
     ];
     
     console.log('🏠 Checking LUME .local hostnames:', lumeHostnames);
@@ -144,7 +181,7 @@ export class ControllerDiscovery {
     let controllerType: 'firework' | 'lights' | null = null;
     if (ip.includes('lume-controller')) {
       controllerType = 'firework';
-    } else if (ip.includes('lume-lights')) {
+    } else if (ip.includes('lume-lighting')) {
       controllerType = 'lights';
     }
     

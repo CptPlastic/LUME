@@ -10,6 +10,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
+import { LightingControls } from './LightingControls';
 import type { ESP32Controller } from '../types';
 
 interface ControllerCardProps {
@@ -268,6 +269,11 @@ export const ControllerCard: React.FC<ControllerCardProps> = ({ controller }) =>
               ))}
             </div>
           </div>
+        )}
+
+        {/* Lighting Controls (for lighting controllers) */}
+        {controller.type === 'lights' && isConnected && (
+          <LightingControls controllerId={controller.id} />
         )}
 
         {/* Action Buttons */}
