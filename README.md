@@ -67,6 +67,14 @@ Professional lighting control with relay switching:
 
 ## 🚀 Quick Start Guide
 
+### 📦 Installation
+
+For the **LUME Desktop Controller app**:
+- **Download**: Get the latest `.dmg` file from releases
+- **Install**: Drag to Applications folder
+- **Documentation**: See [INSTALL.md](INSTALL.md) for detailed instructions
+- **Build from source**: See [BUILD_GUIDE.md](BUILD_GUIDE.md) for development setup
+
 ### 1. 🚨 SAFETY FIRST - Power-On Sequence
 
 ```text
