@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Settings, Search, Lightbulb } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
+import { ESP32API } from '../services/esp32-api';
 import { LightingEffectTypeCard } from './LightingEffectTypeCard';
 import { LightingEffectTypeModal } from './LightingEffectTypeModal';
 import type { LightingEffectType } from '../types';
 import { LightingEffectService } from '../services/lighting-effect-service';
 
 export const LightingEffectManager: React.FC = () => {
-  const { lightingEffectTypes, addLightingEffectType, updateLightingEffectType, removeLightingEffectType } = useLumeStore();
+  const { lightingEffectTypes, addLightingEffectType, updateLightingEffectType, removeLightingEffectType, controllers } = useLumeStore();
 
   const [showModal, setShowModal] = useState(false);
   const [editingEffect, setEditingEffect] = useState<LightingEffectType | null>(null);
@@ -17,6 +18,85 @@ export const LightingEffectManager: React.FC = () => {
   const [filterEffectType, setFilterEffectType] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [selectedController, setSelectedController] = useState('');
+  const [selectedRelays, setSelectedRelays] = useState<number[]>([]);
+
+  const handleTestLightingEffect = async (lightingEffect: LightingEffectType) => {
+    console.log('🧪 Testing lighting effect:', lightingEffect.name);
+    
+    if (!selectedController) {
+      alert('Please select a lighting controller first');
+      return;
+    }
+
+    const controller = controllers.find(c => c.id === selectedController);
+    if (!controller) {
+      alert('Selected controller not found');
+      return;
+    }
+
+    if (controller.type !== 'lights') {
+      alert('Please select a lighting controller');
+      return;
+    }
+
+    try {
+      const api = new ESP32API(`http://${controller.ip}`);
+      
+      // Map lighting effect type to ESP32 effect type
+      let effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
+      switch (lightingEffect.effectType) {
+        case 'solid': effectType = 'SOLID'; break;
+        case 'strobe': effectType = 'STROBE'; break;
+        case 'chase': effectType = 'CHASE'; break;
+        case 'fade': effectType = 'FADE'; break;
+        case 'random': effectType = 'RANDOM'; break;
+        default: effectType = 'SOLID'; break;
+      }
+
+      // If specific relays are selected, test each one individually
+      if (selectedRelays.length > 0) {
+        console.log('🎛️ Testing specific relays:', selectedRelays);
+        
+        // Turn on selected relays
+        for (const relay of selectedRelays) {
+          await api.setRelay(relay, 'ON');
+        }
+        
+        // Wait for the effect duration
+        setTimeout(async () => {
+          try {
+            // Turn off selected relays
+            for (const relay of selectedRelays) {
+              await api.setRelay(relay, 'OFF');
+            }
+            console.log('✅ Specific relay test completed');
+          } catch (error) {
+            console.error('❌ Failed to stop specific relay test:', error);
+          }
+        }, lightingEffect.duration);
+      } else {
+        // Test all relays with the full effect
+        console.log('🎛️ Testing all relays with effect');
+        await api.startEffect(effectType, lightingEffect.interval);
+        
+        // Stop the effect after the duration
+        setTimeout(async () => {
+          try {
+            await api.stopEffect();
+            console.log('✅ Full effect test completed');
+          } catch (error) {
+            console.error('❌ Failed to stop full effect test:', error);
+          }
+        }, lightingEffect.duration);
+      }
+
+      console.log('✅ Test lighting effect started');
+    } catch (error) {
+      console.error('❌ Failed to test lighting effect:', error);
+      alert('Failed to test lighting effect. Check controller connection.');
+    }
+  };
 
   // Filter lighting effect types
   const filteredEffectTypes = useMemo(() => {
@@ -104,6 +184,71 @@ export const LightingEffectManager: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="bg-gray-800 rounded-lg p-6 space-y-4">
+        {/* Controller Selection for Testing */}
+        <div className="mb-4 p-4 bg-gray-700 rounded-lg space-y-4">
+          <div>
+            <label htmlFor="controller-select" className="block text-sm font-medium text-gray-300 mb-2">
+              Select Controller for Testing
+            </label>
+            <select
+              id="controller-select"
+              value={selectedController}
+              onChange={(e) => setSelectedController(e.target.value)}
+              className="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+            >
+              <option value="">Select a lighting controller...</option>
+              {controllers
+                .filter(c => c.status === 'connected' && c.type === 'lights')
+                .map(controller => (
+                  <option key={controller.id} value={controller.id}>
+                    {controller.name}
+                  </option>
+                ))}
+            </select>
+            {controllers.filter(c => c.status === 'connected' && c.type === 'lights').length === 0 && (
+              <p className="text-sm text-yellow-400 mt-1">
+                No lighting controllers connected. Go to Controllers tab to scan for devices.
+              </p>
+            )}
+          </div>
+
+          {/* Relay Channel Selection */}
+          {selectedController && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Test Specific Relay Channels (1-12)
+              </label>
+              <div className="grid grid-cols-6 gap-2">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(relay => (
+                  <button
+                    key={relay}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRelays(prev => 
+                        prev.includes(relay) 
+                          ? prev.filter(r => r !== relay)
+                          : [...prev, relay]
+                      );
+                    }}
+                    className={`p-2 text-sm rounded border transition-colors ${
+                      selectedRelays.includes(relay)
+                        ? 'bg-lume-primary border-lume-primary text-white'
+                        : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'
+                    }`}
+                  >
+                    {relay}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                {selectedRelays.length === 0 
+                  ? 'No relays selected - will test all relays with full effect' 
+                  : `Selected relays: ${selectedRelays.join(', ')} - will test only these relays`}
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center space-x-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -291,6 +436,7 @@ export const LightingEffectManager: React.FC = () => {
                 lightingEffectType={effectType}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onTest={handleTestLightingEffect}
               />
             ))}
           </div>

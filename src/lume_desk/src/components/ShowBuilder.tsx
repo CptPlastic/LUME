@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Play, Pause, Trash2, Settings, Clock, Lightbulb, Zap } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Play, Pause, Settings, Clock, Lightbulb, Zap, Download, Upload } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
-import type { ShowSequence, FireworkType, LightingEffectType } from '../types';
+import { ESP32API } from '../services/esp32-api';
+import type { ShowSequence, FireworkType, LightingEffectType, ShowFile } from '../types';
 import { FireworkTypeCard } from './FireworkTypeCard';
 import { LightingEffectTypeCard } from './LightingEffectTypeCard';
+import { ShowTimeline } from './ShowTimeline';
 
 export const ShowBuilder: React.FC = () => {
   const { 
@@ -14,10 +16,77 @@ export const ShowBuilder: React.FC = () => {
     createShow, 
     addShowSequence, 
     removeShowSequence,
+    updateShowSequence,
     isPlaying,
     playShow,
-    stopShow
+    stopShow,
+    currentPlaybackTime,
+    setShowAudio,
+    removeShowAudio,
+    moveSequence,
+    seekTo,
+    restoreShowAudio,
+    importShow,
+    downloadShow
   } = useLumeStore();
+
+  // File input ref for import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Import/Export handlers
+  const handleExportShow = async () => {
+    if (!currentShow) {
+      alert('No show to export');
+      return;
+    }
+    
+    try {
+      await downloadShow(currentShow.id);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export show. Please try again.');
+    }
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      const showFile: ShowFile = JSON.parse(content);
+      
+      const success = await importShow(showFile);
+      if (success) {
+        alert('Show imported successfully!');
+      } else {
+        alert('Failed to import show. Please check the file format.');
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Failed to import show. Please check the file format.');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Restore audio on component mount if needed
+  useEffect(() => {
+    if (currentShow?.audio) {
+      console.log('🔄 Checking if audio needs restoration...', {
+        hasFile: !!currentShow.audio.file,
+        hasUrl: !!currentShow.audio.url,
+        audioId: currentShow.audio.id
+      });
+      
+      // Always try to restore if we have audio metadata but no file/URL
+      if (!currentShow.audio.file && !currentShow.audio.url) {
+        console.log('🔄 Audio needs restoration, calling restoreShowAudio...');
+        restoreShowAudio();
+      }
+    }
+  }, [currentShow?.id, currentShow?.audio?.id, restoreShowAudio]);
 
   const [showName, setShowName] = useState('New Show');
   const [showDescription, setShowDescription] = useState('');
@@ -28,28 +97,33 @@ export const ShowBuilder: React.FC = () => {
   const [selectedController, setSelectedController] = useState('');
   const [selectedArea, setSelectedArea] = useState(1);
   const [selectedChannel, setSelectedChannel] = useState(1);
+  const [selectedRelays, setSelectedRelays] = useState<number[]>([]);
   const [effectDuration, setEffectDuration] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Calculate show duration and statistics
   const showStats = useMemo(() => {
     if (!currentShow?.sequences) {
-      return { duration: 0, totalFireworks: 0, totalLighting: 0, controllers: new Set(), channels: new Set() };
+      return { duration: currentShow?.audio?.duration || 0, totalFireworks: 0, totalLighting: 0, controllers: new Set(), channels: new Set() };
     }
 
     const sequences = currentShow.sequences;
-    const maxTime = sequences.reduce((max, seq) => {
+    const maxSequenceTime = sequences.reduce((max, seq) => {
       let endTime = seq.timestamp;
       if (seq.type === 'firework' && seq.fireworkType) {
         endTime += seq.fireworkType.duration;
-      } else if (seq.type === 'lighting' && seq.lightingEffectType) {
-        endTime += seq.lightingEffectType.duration * 1000; // Convert to milliseconds
+      } else if (seq.type === 'lighting') {
+        // Use custom duration if available, otherwise use effect type duration
+        const duration = seq.duration || (seq.lightingEffectType?.duration ? seq.lightingEffectType.duration * 1000 : 5000);
+        endTime += duration;
       }
       return Math.max(max, endTime);
     }, 0);
+
+    // Prioritize audio duration if available, otherwise use sequence timing
+    const showDuration = currentShow.audio?.duration || maxSequenceTime;
 
     const controllers = new Set(sequences.map(seq => seq.controllerId));
     const channels = new Set(sequences.map(seq => seq.channel));
@@ -57,7 +131,7 @@ export const ShowBuilder: React.FC = () => {
     const lightingCount = sequences.filter(seq => seq.type === 'lighting').length;
 
     return {
-      duration: maxTime,
+      duration: showDuration,
       totalFireworks: fireworkCount,
       totalLighting: lightingCount,
       controllers,
@@ -97,6 +171,71 @@ export const ShowBuilder: React.FC = () => {
   const lightingCategories = ['mood', 'party', 'strobe', 'chase', 'fade', 'pattern', 'special'];
 
   const getCurrentCategories = () => effectTab === 'fireworks' ? fireworkCategories : lightingCategories;
+
+  const handleTestLightingEffect = async (lightingEffect: LightingEffectType) => {
+    console.log('🧪 Testing lighting effect:', lightingEffect.name);
+    
+    if (!selectedController) {
+      alert('Please select a controller first');
+      return;
+    }
+
+    const controller = controllers.find(c => c.id === selectedController);
+    if (!controller) {
+      alert('Selected controller not found');
+      return;
+    }
+
+    if (controller.type !== 'lights') {
+      alert('Please select a lighting controller');
+      return;
+    }
+
+    try {
+      const api = new ESP32API(`http://${controller.ip}`);
+      
+      // Map lighting effect type to ESP32 effect type
+      let effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
+      switch (lightingEffect.effectType) {
+        case 'solid': effectType = 'SOLID'; break;
+        case 'strobe': effectType = 'STROBE'; break;
+        case 'chase': effectType = 'CHASE'; break;
+        case 'fade': effectType = 'FADE'; break;
+        case 'random': effectType = 'RANDOM'; break;
+        default: effectType = 'SOLID'; break;
+      }
+
+      // Start the effect with interval if specified
+      await api.startEffect(effectType, lightingEffect.interval);
+      
+      // Stop the effect after the duration
+      setTimeout(async () => {
+        try {
+          await api.stopEffect();
+          console.log('✅ Test lighting effect stopped');
+        } catch (error) {
+          console.error('❌ Failed to stop test effect:', error);
+        }
+      }, lightingEffect.duration);
+
+      console.log('✅ Test lighting effect started');
+    } catch (error) {
+      console.error('❌ Failed to test lighting effect:', error);
+      alert('Failed to test lighting effect. Check controller connection.');
+    }
+  };
+
+  const handleEditFirework = (firework: FireworkType) => {
+    console.log('✏️ Edit firework requested:', firework.name);
+    // For now, just log - could add inline editing or redirect to manager
+    alert(`Edit "${firework.name}" - Use the Firework Types page for editing`);
+  };
+
+  const handleEditLighting = (lighting: LightingEffectType) => {
+    console.log('✏️ Edit lighting effect requested:', lighting.name);
+    // For now, just log - could add inline editing or redirect to manager  
+    alert(`Edit "${lighting.name}" - Use the Lighting Effects page for editing`);
+  };
 
   const handleCreateShow = () => {
     console.log('🎬 Create show clicked:', { showName, showDescription });
@@ -182,7 +321,7 @@ export const ShowBuilder: React.FC = () => {
         lightingEffectType: selectedLightingEffect,
         controllerId: selectedController,
         area: selectedArea,
-        channel: selectedChannel,
+        relays: selectedRelays.length > 0 ? selectedRelays : undefined, // Use selected relays or all relays
         duration: effectDuration * 1000, // Convert to milliseconds
         delay: 0,
         repeat: 1
@@ -196,25 +335,6 @@ export const ShowBuilder: React.FC = () => {
       setSequenceTime(Math.round(nextTime * 10) / 10); // Round to 1 decimal
       console.log('⏰ Auto-incremented time to:', nextTime);
     }
-  };
-
-  const handleRemoveSequence = (sequenceId: string) => {
-    console.log('🗑️ Remove sequence clicked:', sequenceId);
-    setConfirmDelete(sequenceId);
-  };
-
-  const confirmRemoveSequence = () => {
-    if (confirmDelete) {
-      console.log('✅ User confirmed removal, calling removeShowSequence');
-      removeShowSequence(confirmDelete);
-      console.log('✅ removeShowSequence called, current show sequences:', currentShow?.sequences.length);
-      setConfirmDelete(null);
-    }
-  };
-
-  const cancelRemoveSequence = () => {
-    console.log('❌ User cancelled removal');
-    setConfirmDelete(null);
   };
 
   const formatTime = (milliseconds: number) => {
@@ -241,6 +361,30 @@ export const ShowBuilder: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-3">
+          {/* Import Show Button */}
+          <label className="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors cursor-pointer">
+            <Upload className="w-4 h-4" />
+            <span>Import</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,.lume-show.json"
+              onChange={handleFileImport}
+              className="hidden"
+            />
+          </label>
+          
+          {/* Export Show Button */}
+          <button
+            onClick={handleExportShow}
+            disabled={!currentShow}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+          
+          {/* Play/Stop Button */}
           <button
             onClick={isPlaying ? stopShow : playShow}
             disabled={!currentShow || currentShow.sequences.length === 0}
@@ -338,6 +482,7 @@ export const ShowBuilder: React.FC = () => {
                 setEffectTab('lighting');
                 setFilterCategory('');
                 setSearchTerm('');
+                setSelectedRelays([]); // Reset relay selection when switching to lighting
               }}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 effectTab === 'lighting'
@@ -409,11 +554,11 @@ export const ShowBuilder: React.FC = () => {
               >
                 <FireworkTypeCard
                   fireworkType={fireworkType}
-                  onEdit={() => {}} // Disabled in show builder
+                  onEdit={handleEditFirework}
                   onDelete={() => {}} // Disabled in show builder
                   onSelect={() => setSelectedFireworkType(fireworkType)}
                   isSelected={selectedFireworkType?.id === fireworkType.id}
-                  showActions={false}
+                  showActions={true}
                 />
               </button>
             ))}
@@ -431,15 +576,17 @@ export const ShowBuilder: React.FC = () => {
                   console.log('💡 Lighting effect selected:', lightingEffect.name);
                   setSelectedLightingEffect(lightingEffect);
                   setSelectedFireworkType(null);
+                  setSelectedRelays([]); // Reset relay selection
                 }}
               >
                 <LightingEffectTypeCard
                   lightingEffectType={lightingEffect}
-                  onEdit={() => {}} // Disabled in show builder
+                  onEdit={handleEditLighting}
                   onDelete={() => {}} // Disabled in show builder
+                  onTest={handleTestLightingEffect}
                   onSelect={() => setSelectedLightingEffect(lightingEffect)}
                   isSelected={selectedLightingEffect?.id === lightingEffect.id}
-                  showActions={false}
+                  showActions={true}
                 />
               </button>
             ))}
@@ -500,20 +647,53 @@ export const ShowBuilder: React.FC = () => {
               </div>
 
               {effectTab === 'lighting' && (
-                <div>
-                  <label htmlFor="effect-duration" className="block text-sm font-medium text-gray-300 mb-2">
-                    Duration (seconds)
-                  </label>
-                  <input
-                    id="effect-duration"
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    value={effectDuration}
-                    onChange={(e) => setEffectDuration(parseFloat(e.target.value) || 5)}
-                    className="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label htmlFor="effect-duration" className="block text-sm font-medium text-gray-300 mb-2">
+                      Duration (seconds)
+                    </label>
+                    <input
+                      id="effect-duration"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={effectDuration}
+                      onChange={(e) => setEffectDuration(parseFloat(e.target.value) || 5)}
+                      className="w-full bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Relay Channels (1-12)
+                    </label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(relay => (
+                        <button
+                          key={relay}
+                          type="button"
+                          onClick={() => {
+                            setSelectedRelays(prev => 
+                              prev.includes(relay) 
+                                ? prev.filter(r => r !== relay)
+                                : [...prev, relay]
+                            );
+                          }}
+                          className={`p-2 text-sm rounded border transition-colors ${
+                            selectedRelays.includes(relay)
+                              ? 'bg-lume-primary border-lume-primary text-white'
+                              : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'
+                          }`}
+                        >
+                          {relay}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {selectedRelays.length === 0 ? 'Select relay channels (none = all relays)' : `Selected: ${selectedRelays.join(', ')}`}
+                    </p>
+                  </div>
+                </>
               )}
 
               <div>
@@ -551,112 +731,37 @@ export const ShowBuilder: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* Show Timeline */}
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Show Timeline</h2>
-          
-          {!currentShow && (
-            <div className="text-center py-12">
-              <Clock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-300 mb-2">No Show Created</h3>
-              <p className="text-gray-500">Create a new show to start building your sequence.</p>
-            </div>
-          )}
-
-          {currentShow && currentShow.sequences.length === 0 && (
-            <div className="text-center py-12">
-              <Plus className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-300 mb-2">Empty Show</h3>
-              <p className="text-gray-500">Add fireworks and lighting effects to your show to see the timeline.</p>
-            </div>
-          )}
-
-          {currentShow && currentShow.sequences.length > 0 && (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {(() => {
-                const sortedSequences = [...currentShow.sequences].sort((a, b) => a.timestamp - b.timestamp);
-                console.log('📅 Timeline showing sequences:', sortedSequences.map(s => ({ id: s.id, name: s.fireworkType?.name })));
-                return sortedSequences;
-              })()
-                .map((sequence) => (
-                  <div
-                    key={sequence.id}
-                    className="flex items-center justify-between p-3 bg-gray-700 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <div className="text-sm font-mono text-lume-primary">
-                          {formatTime(sequence.timestamp)}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {sequence.type === 'firework' ? (
-                            <Zap className="w-4 h-4 text-orange-400" />
-                          ) : (
-                            <Lightbulb className="w-4 h-4 text-blue-400" />
-                          )}
-                          <div className="text-white font-medium">
-                            {sequence.type === 'firework' 
-                              ? sequence.fireworkType?.name || 'Unknown Firework'
-                              : sequence.lightingEffectType?.name || 'Unknown Effect'
-                            }
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-400 mt-1">
-                        {sequence.controllerId} • Area {sequence.area} • Channel {sequence.channel}
-                        {sequence.type === 'firework' && sequence.fireworkType && (
-                          <span> • {formatTime(sequence.fireworkType.duration)}</span>
-                        )}
-                        {sequence.type === 'lighting' && sequence.duration && (
-                          <span> • {formatTime(sequence.duration)}</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('🗑️ Delete button clicked for sequence:', sequence.id);
-                        handleRemoveSequence(sequence.id);
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-400 transition-colors flex-shrink-0"
-                      title={`Remove ${sequence.type} from show`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-white mb-4">Remove Effect</h3>
-            <p className="text-gray-300 mb-6">
-              Are you sure you want to remove this effect from the show? This action cannot be undone.
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={cancelRemoveSequence}
-                className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRemoveSequence}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
+      {/* Full-Width Show Timeline */}
+      <div className="bg-gray-800 rounded-lg p-8 shadow-xl border border-gray-700">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white mb-2">Show Timeline</h2>
+          <p className="text-gray-400">Timeline view of your show with synchronized audio and effects</p>
         </div>
-      )}
+        
+        {!currentShow ? (
+          <div className="text-center py-12">
+            <Clock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-300 mb-2">No Show Created</h3>
+            <p className="text-gray-500">Create a new show to start building your sequence.</p>
+          </div>
+        ) : (
+          <ShowTimeline
+            show={currentShow}
+            isPlaying={isPlaying}
+            currentTime={currentPlaybackTime}
+            onSequenceMove={moveSequence}
+            onSequenceDelete={removeShowSequence}
+            onSequenceUpdate={updateShowSequence}
+            onAudioUpload={setShowAudio}
+            onAudioRemove={removeShowAudio}
+            onPlay={playShow}
+            onPause={stopShow}
+            onSeek={seekTo}
+          />
+        )}
+      </div>
     </div>
   );
 };

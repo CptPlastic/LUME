@@ -1,11 +1,12 @@
 import React from 'react';
-import { Zap, Clock, Edit, Trash2, Lightbulb, Flashlight } from 'lucide-react';
+import { Zap, Clock, Edit, Trash2, Lightbulb, Flashlight, Play } from 'lucide-react';
 import type { LightingEffectType } from '../types';
 
 interface LightingEffectTypeCardProps {
   lightingEffectType: LightingEffectType;
   onEdit: (effectType: LightingEffectType) => void;
   onDelete: (id: string) => void;
+  onTest?: (effectType: LightingEffectType) => void;
   onSelect?: (effectType: LightingEffectType) => void;
   isSelected?: boolean;
   showActions?: boolean;
@@ -15,6 +16,7 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
   lightingEffectType,
   onEdit,
   onDelete,
+  onTest,
   onSelect,
   isSelected = false,
   showActions = true
@@ -106,6 +108,18 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
         
         {showActions && (
           <div className="flex space-x-1 ml-2">
+            {onTest && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTest(lightingEffectType);
+                }}
+                className="p-1.5 text-gray-400 hover:text-green-400 transition-colors"
+                title="Test lighting effect"
+              >
+                <Play className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

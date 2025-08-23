@@ -122,6 +122,7 @@ export interface Show {
   description: string;
   sequences: ShowSequence[];
   lightingSequences: LightingShowSequence[]; // New lighting sequences
+  audio?: AudioTrack; // Optional audio track for synchronization
   createdAt: Date;
   modifiedAt: Date;
   version: string; // for compatibility
@@ -131,7 +132,20 @@ export interface Show {
     songName?: string;
     artist?: string;
     tags?: string[];
+    duration?: number; // Total show duration in milliseconds
   };
+}
+
+export interface AudioTrack {
+  id: string;
+  name: string;
+  file?: File; // For uploaded files
+  url?: string; // For linked audio (URL/streaming)
+  duration: number; // Duration in milliseconds
+  format: string; // 'mp3', 'wav', 'ogg', etc.
+  size?: number; // File size in bytes
+  uploadedAt: Date;
+  waveformData?: number[]; // Pre-computed waveform for visualization
 }
 
 export interface LightingShowSequence {
@@ -185,7 +199,7 @@ export interface SequenceStep {
   safetyChecked?: boolean;
 }
 
-// Show File Format for Import/Export
+// Enhanced Show File Format for Import/Export with audio support
 export interface ShowFile {
   version: string;
   format: 'lume-show-v1';
@@ -199,12 +213,21 @@ export interface ShowFile {
   };
   show: Show;
   fireworkTypes: FireworkType[];
+  lightingEffectTypes?: LightingEffectType[]; // Enhanced to support lighting effects
   controllers: {
     id: string;
     name: string;
     type: 'firework' | 'lights';
     channels?: number;
   }[];
+  audioData?: {
+    id: string;
+    name: string;
+    type: string;
+    base64: string;
+    size: number;
+    duration: number;
+  };
 }
 
 // Store types
@@ -251,7 +274,8 @@ export interface LumeStore {
   updateLightingEffectType: (id: string, updates: Partial<LightingEffectType>) => void;
   removeLightingEffectType: (id: string) => void;
   
-  // Import/Export
-  exportShow: (showId: string) => ShowFile;
-  importShow: (showFile: ShowFile) => boolean;
+  // Enhanced Import/Export with async support
+  exportShow: (showId: string) => Promise<ShowFile>;
+  importShow: (showFile: ShowFile) => Promise<boolean>;
+  downloadShow: (showId?: string) => Promise<void>;
 }

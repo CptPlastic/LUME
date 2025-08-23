@@ -1,15 +1,19 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile, LightingEffectType } from '../types';
+import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile, LightingEffectType, AudioTrack } from '../types';
 import { ESP32API, controllerDiscovery } from '../services/esp32-api';
 import { FireworkService } from '../services/firework-service';
 import { LightingEffectService } from '../services/lighting-effect-service';
+import { audioStorageService } from '../services/audio-storage';
+import { ShowService } from '../services/show-service';
 
 interface LumeStoreImpl extends LumeStore {
   // Additional internal state
   apis: Map<string, ESP32API>;
   lastScanTime: Date | null;
   showTimeouts: NodeJS.Timeout[];
+  currentPlaybackTime: number; // Current playback position in milliseconds
+  currentAudio: HTMLAudioElement | null; // Current audio element for playback
   
   // Enhanced controller actions
   scanForControllers: () => Promise<void>;
@@ -32,6 +36,13 @@ interface LumeStoreImpl extends LumeStore {
   // Show management
   createShow: (name: string, description: string) => void;
   deleteShow: (id: string) => void;
+  
+  // Audio and timeline management
+  setShowAudio: (audioTrack: AudioTrack) => Promise<void>;
+  removeShowAudio: () => void;
+  restoreShowAudio: () => Promise<void>;
+  moveSequence: (sequenceId: string, newTimestamp: number) => void;
+  seekTo: (timestamp: number) => void;
 }
 
 export const useLumeStore = create<LumeStoreImpl>()(
@@ -49,6 +60,8 @@ export const useLumeStore = create<LumeStoreImpl>()(
         apis: new Map(),
         lastScanTime: null,
         showTimeouts: [],
+        currentPlaybackTime: 0,
+        currentAudio: null,
 
         // Basic controller management
         addController: (controller: ESP32Controller) => {
@@ -356,7 +369,13 @@ export const useLumeStore = create<LumeStoreImpl>()(
 
         // Show management
         loadShow: (show: Show) => {
-          set({ currentShow: show, isPlaying: false });
+          // Ensure Date objects are properly restored if they were serialized as strings
+          const restoredShow = {
+            ...show,
+            createdAt: show.createdAt instanceof Date ? show.createdAt : new Date(show.createdAt),
+            modifiedAt: show.modifiedAt instanceof Date ? show.modifiedAt : new Date(show.modifiedAt),
+          };
+          set({ currentShow: restoredShow, isPlaying: false });
         },
 
         saveShow: (show: Show) => {
@@ -390,12 +409,17 @@ export const useLumeStore = create<LumeStoreImpl>()(
         // Show sequence management
         addShowSequence: (sequence: Omit<ShowSequence, 'id'>) => {
           const { currentShow } = get();
-          if (!currentShow) return;
+          if (!currentShow) {
+            console.warn('❌ Cannot add sequence: No current show selected');
+            return;
+          }
 
           const newSequence: ShowSequence = {
             ...sequence,
             id: `seq-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
           };
+
+          console.log('✅ Adding sequence to show:', newSequence);
 
           const updatedShow: Show = {
             ...currentShow,
@@ -404,6 +428,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           };
 
           set({ currentShow: updatedShow });
+          console.log(`📋 Show now has ${updatedShow.sequences.length} sequences total`);
         },
 
         removeShowSequence: (sequenceId: string) => {
@@ -485,32 +510,106 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }));
         },
 
-        // Import/Export
-        exportShow: (showId: string): ShowFile => {
-          const { currentShow, fireworkTypes, controllers } = get();
+        // Enhanced Import/Export with audio support
+        exportShow: async (showId: string): Promise<ShowFile> => {
+          const { currentShow, fireworkTypes, lightingEffectTypes, controllers } = get();
           if (!currentShow || currentShow.id !== showId) {
             throw new Error('Show not found');
           }
-          return FireworkService.exportShow(currentShow, fireworkTypes, controllers);
+          
+          // Create backup before any operations
+          await ShowService.createShowBackup(currentShow);
+          
+          return ShowService.exportShow(currentShow, fireworkTypes, lightingEffectTypes, controllers);
         },
 
-        importShow: (showFile: ShowFile): boolean => {
-          const result = FireworkService.importShow(showFile);
-          if (result.success && result.show && result.fireworkTypes) {
-            set({ currentShow: result.show });
-            // Add imported firework types
-            result.fireworkTypes.forEach(ft => {
-              get().addFireworkType(ft);
-            });
-            return true;
+        importShow: async (showFile: ShowFile): Promise<boolean> => {
+          try {
+            const result = await ShowService.importShow(showFile);
+            if (result.success && result.show) {
+              
+              // Backup current show if one exists
+              const { currentShow } = get();
+              if (currentShow) {
+                await ShowService.createShowBackup(currentShow);
+              }
+
+              set({ currentShow: result.show });
+              
+              // Add imported firework types
+              if (result.fireworkTypes) {
+                result.fireworkTypes.forEach(ft => {
+                  get().addFireworkType(ft);
+                });
+              }
+              
+              // Add imported lighting effect types
+              if (result.lightingEffectTypes) {
+                result.lightingEffectTypes.forEach(lt => {
+                  get().addLightingEffectType(lt);
+                });
+              }
+              
+              // Restore audio if imported
+              if (result.audioRestored && result.show.audio) {
+                console.log('🎵 Audio imported with show, restoring...');
+                await get().restoreShowAudio();
+              }
+              
+              // Clean up old backups
+              ShowService.cleanupBackups();
+              
+              console.log(`📥 Successfully imported show: ${result.show.name}`);
+              return true;
+            } else {
+              console.error('❌ Import failed:', result.errors);
+              return false;
+            }
+          } catch (error) {
+            console.error('❌ Import error:', error);
+            return false;
           }
-          return false;
+        },
+
+        downloadShow: async (showId?: string) => {
+          try {
+            const { currentShow, fireworkTypes, lightingEffectTypes, controllers } = get();
+            const id = showId || currentShow?.id;
+            if (!id || !currentShow) {
+              console.error('No show to download');
+              alert('No show to export');
+              return;
+            }
+            
+            console.log('📤 Preparing show download...');
+            
+            // Create backup before export
+            await ShowService.createShowBackup(currentShow);
+            
+            // Export the show directly
+            const showFile = await ShowService.exportShow(currentShow, fireworkTypes, lightingEffectTypes, controllers);
+            ShowService.downloadShowFile(showFile);
+            
+            console.log('✅ Show export completed');
+          } catch (error) {
+            console.error('❌ Download failed:', error);
+            alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         },
 
         playShow: () => {
+          console.log('🎮 PlayShow method called!');
           const { currentShow } = get();
-          if (!currentShow || currentShow.sequences.length === 0) {
-            console.warn('No show or sequences to play');
+          console.log('🎮 Current show:', currentShow);
+          console.log('🎮 Show sequences count:', currentShow?.sequences?.length || 0);
+          if (!currentShow) {
+            console.warn('❌ No current show selected');
+            alert('❌ No show selected. Please create a show first.');
+            return;
+          }
+          if (currentShow.sequences.length === 0) {
+            console.warn('❌ No sequences in the current show');
+            alert('❌ No sequences in show. Please add firework or lighting sequences using "Add to Show" button.');
             return;
           }
 
@@ -519,6 +618,68 @@ export const useLumeStore = create<LumeStoreImpl>()(
           set({ isPlaying: true, showTimeouts: [] });
 
           console.log(`🎬 Starting show "${currentShow.name}" with ${currentShow.sequences.length} sequences`);
+          console.log(`🎬 Sequences:`, currentShow.sequences.map(s => ({
+            id: s.id,
+            type: s.type,
+            timestamp: s.timestamp,
+            name: s.fireworkType?.name || s.lightingEffectType?.name
+          })));
+
+          // Start audio playback if available
+          if (currentShow.audio) {
+            console.log(`🎵 Starting audio playback: ${currentShow.audio.name}`);
+            console.log(`🎵 Audio has file:`, !!currentShow.audio.file);
+            console.log(`🎵 Audio has URL:`, !!currentShow.audio.url);
+            console.log(`🎵 Audio file type:`, currentShow.audio.file?.type);
+            console.log(`🎵 Audio file size:`, currentShow.audio.file?.size);
+            
+            try {
+              const audio = new Audio();
+              
+              if (currentShow.audio.file) {
+                // For uploaded files, create object URL
+                console.log(`🎵 Creating object URL for file...`);
+                const audioUrl = URL.createObjectURL(currentShow.audio.file);
+                audio.src = audioUrl;
+                console.log(`🎵 Audio src set to:`, audioUrl);
+              } else if (currentShow.audio.url) {
+                // For linked URLs
+                console.log(`🎵 Using direct URL:`, currentShow.audio.url);
+                audio.src = currentShow.audio.url;
+              } else {
+                console.error(`❌ No audio file or URL available!`);
+                return;
+              }
+              
+              if (audio.src) {
+                audio.currentTime = 0;
+                console.log(`🎵 Attempting to play audio...`);
+                audio.play().then(() => {
+                  console.log(`✅ Audio playback started successfully`);
+                }).catch((error) => {
+                  console.error(`❌ Failed to start audio playback:`, error);
+                  alert(`Failed to play audio: ${error.message}`);
+                });
+                
+                // Store audio reference for potential stopping later
+                set({ currentAudio: audio });
+              }
+            } catch (error) {
+              console.error(`💥 Error setting up audio playback:`, error);
+            }
+          } else {
+            console.log(`🔇 No audio track for this show`);
+          }
+
+          // Start playback time tracking
+          const startTime = Date.now();
+          const playbackTimer = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            set({ currentPlaybackTime: elapsed });
+          }, 100); // Update every 100ms for smooth progress
+
+          // Store timer for cleanup
+          get().showTimeouts.push(playbackTimer as any);
 
           // Sort sequences by timestamp
           const sortedSequences = [...currentShow.sequences].sort((a, b) => a.timestamp - b.timestamp);
@@ -568,7 +729,20 @@ export const useLumeStore = create<LumeStoreImpl>()(
           });
 
           // Auto-stop when show is complete
-          const showDuration = Math.max(...sortedSequences.map(s => s.timestamp)) + 5000; // Add 5 seconds buffer
+          // If there's audio, use audio duration. Otherwise, use sequence timings with buffer
+          const sequenceDuration = sortedSequences.length > 0 
+            ? Math.max(...sortedSequences.map(s => s.timestamp)) + 5000 
+            : 5000; // Default 5 seconds if no sequences
+          
+          const showDuration = currentShow.audio?.duration || sequenceDuration;
+          
+          console.log(`🎬 Show will run for ${showDuration}ms (${showDuration/1000}s)`, {
+            hasAudio: !!currentShow.audio,
+            audioDuration: currentShow.audio?.duration,
+            sequenceDuration,
+            finalDuration: showDuration
+          });
+          
           const stopTimeout = setTimeout(() => {
             console.log('🎬 Show completed');
             get().stopShow();
@@ -578,14 +752,144 @@ export const useLumeStore = create<LumeStoreImpl>()(
         },
 
         stopShow: () => {
+          console.log('🛑 StopShow method called!');
           console.log('🛑 Stopping show');
+          
+          // Stop audio playback if playing
+          const { currentAudio } = get();
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            console.log('🔇 Stopped audio playback');
+            set({ currentAudio: null });
+          }
           
           // Clear all timeouts
           get().showTimeouts.forEach(timeout => clearTimeout(timeout));
-          set({ isPlaying: false, showTimeouts: [] });
+          set({ isPlaying: false, showTimeouts: [], currentPlaybackTime: 0 });
 
           // Emergency stop all controllers as safety measure
           get().emergencyStopAll();
+        },
+
+        // Audio and timeline management
+        setShowAudio: async (audioTrack: AudioTrack) => {
+          const { currentShow } = get();
+          if (!currentShow) return;
+
+          // Store uploaded files persistently
+          if (audioTrack.file) {
+            try {
+              await audioStorageService.storeAudioFile(audioTrack);
+              console.log(`💾 Audio file stored: ${audioTrack.name}`);
+            } catch (error) {
+              console.error('Failed to store audio file:', error);
+              // Continue anyway - the file will still work until page reload
+            }
+          }
+
+          const updatedShow: Show = {
+            ...currentShow,
+            audio: audioTrack,
+            metadata: {
+              ...currentShow.metadata,
+              duration: Math.max(
+                audioTrack.duration,
+                currentShow.metadata.duration || 0,
+                ...currentShow.sequences.map(s => s.timestamp + (s.fireworkType?.duration || 0))
+              )
+            },
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
+        },
+
+        removeShowAudio: () => {
+          const { currentShow } = get();
+          if (!currentShow || !currentShow.audio) return;
+
+          // Clean up stored file if it exists
+          if (currentShow.audio.file) {
+            audioStorageService.deleteAudioFile(currentShow.audio.id).catch(error => {
+              console.error('Failed to delete stored audio file:', error);
+            });
+          }
+
+          const updatedShow: Show = {
+            ...currentShow,
+            audio: undefined,
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
+        },
+
+        restoreShowAudio: async () => {
+          const { currentShow } = get();
+          if (!currentShow?.audio) {
+            console.log('🔄 No show or audio to restore');
+            return; // No audio to restore
+          }
+
+          // If it's a URL-based audio, no restoration needed
+          if (currentShow.audio.url) {
+            console.log('🔄 Audio is URL-based, no restoration needed');
+            return;
+          }
+
+          // If file is missing but audio metadata exists, try to restore
+          if (!currentShow.audio.file) {
+            console.log('🔄 Audio file missing, attempting restoration...');
+            try {
+              // Try to restore the file from storage
+              const restoredFile = await audioStorageService.retrieveAudioFile(currentShow.audio.id);
+              if (restoredFile) {
+                const updatedAudio: AudioTrack = {
+                  ...currentShow.audio,
+                  file: restoredFile
+                };
+
+                const updatedShow: Show = {
+                  ...currentShow,
+                  audio: updatedAudio,
+                  modifiedAt: new Date()
+                };
+
+                set({ currentShow: updatedShow });
+                console.log(`🔄 Successfully restored audio file: ${updatedAudio.name}`);
+              } else {
+                console.warn(`⚠️ Could not restore audio file: ${currentShow.audio.name} (ID: ${currentShow.audio.id})`);
+              }
+            } catch (error) {
+              console.error('Failed to restore audio file:', error);
+            }
+          } else {
+            console.log('🔄 Audio file already present, no restoration needed');
+          }
+        },
+
+        moveSequence: (sequenceId: string, newTimestamp: number) => {
+          const { currentShow } = get();
+          if (!currentShow) return;
+
+          const updatedSequences = currentShow.sequences.map(seq =>
+            seq.id === sequenceId
+              ? { ...seq, timestamp: Math.max(0, newTimestamp) }
+              : seq
+          );
+
+          const updatedShow: Show = {
+            ...currentShow,
+            sequences: updatedSequences,
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
+        },
+
+        seekTo: (timestamp: number) => {
+          set({ currentPlaybackTime: Math.max(0, timestamp) });
         },
       }),
       {
@@ -596,6 +900,18 @@ export const useLumeStore = create<LumeStoreImpl>()(
           currentShow: state.currentShow,
           fireworkTypes: state.fireworkTypes,
         }),
+        // Convert string dates back to Date objects after rehydration
+        onRehydrateStorage: () => (state) => {
+          if (state?.currentShow) {
+            // Convert createdAt and modifiedAt back to Date objects if they're strings
+            if (typeof state.currentShow.createdAt === 'string') {
+              state.currentShow.createdAt = new Date(state.currentShow.createdAt);
+            }
+            if (typeof state.currentShow.modifiedAt === 'string') {
+              state.currentShow.modifiedAt = new Date(state.currentShow.modifiedAt);
+            }
+          }
+        },
       }
     ),
     {
