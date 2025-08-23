@@ -32,7 +32,6 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
-  const [resizeStartWidth, setResizeStartWidth] = useState(0);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
   const [testAudio, setTestAudio] = useState<HTMLAudioElement | null>(null);
@@ -115,15 +114,15 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
   };
 
   // Handle resize start for lighting effects
-  const handleResizeMouseDown = (e: React.MouseEvent, sequenceId: string) => {
-    e.preventDefault();
+  const handleResizeStart = (e: React.MouseEvent, sequenceId: string) => {
     e.stopPropagation();
     setIsResizing(sequenceId);
     
     const sequence = show.sequences.find(s => s.id === sequenceId);
     if (sequence && sequence.type === 'lighting') {
       const currentDuration = sequence.duration || sequence.lightingEffectType?.duration || 5000;
-      setResizeStartWidth(timestampToPixel(currentDuration));
+      // Store the initial duration for reference
+      console.log('Starting resize from duration:', currentDuration);
     }
   };
 
@@ -158,7 +157,6 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
     setIsDragging(null);
     setIsResizing(null);
     setDragOffset(0);
-    setResizeStartWidth(0);
   };
 
   // Handle test audio playback
@@ -567,7 +565,7 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
                   {/* Resize handle for lighting effects */}
                   <div
                     className="w-1 h-4 bg-blue-300 hover:bg-blue-200 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity mr-1"
-                    onMouseDown={(e) => handleResizeMouseDown(e, sequence.id)}
+                    onMouseDown={(e) => handleResizeStart(e, sequence.id)}
                     title="Drag to adjust duration"
                   />
                   <button

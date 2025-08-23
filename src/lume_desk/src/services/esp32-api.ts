@@ -116,6 +116,19 @@ export class ESP32API {
     return response.data;
   }
 
+  // NEW: Start lighting effect on specific relays only
+  async startSelectiveEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number): Promise<APIResponse> {
+    const params = new URLSearchParams({ 
+      type,
+      relays: relays.join(',')
+    });
+    if (interval) {
+      params.append('interval', interval.toString());
+    }
+    const response = await this.client.post(`/effect/selective?${params.toString()}`);
+    return response.data;
+  }
+
   async stopEffect(): Promise<APIResponse> {
     const response = await this.client.post('/effect/stop');
     return response.data;

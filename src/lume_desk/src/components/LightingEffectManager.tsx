@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Settings, Search, Lightbulb } from 'lucide-react';
+import { Plus, Settings, Search, Lightbulb, Upload, Download } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 import { ESP32API } from '../services/esp32-api';
 import { LightingEffectTypeCard } from './LightingEffectTypeCard';
@@ -43,36 +43,75 @@ export const LightingEffectManager: React.FC = () => {
     try {
       const api = new ESP32API(`http://${controller.ip}`);
       
-      // Map lighting effect type to ESP32 effect type
+            // Map lighting effect type to ESP32 effect type
       let effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
-      switch (lightingEffect.effectType) {
-        case 'solid': effectType = 'SOLID'; break;
-        case 'strobe': effectType = 'STROBE'; break;
-        case 'chase': effectType = 'CHASE'; break;
-        case 'fade': effectType = 'FADE'; break;
-        case 'random': effectType = 'RANDOM'; break;
-        default: effectType = 'SOLID'; break;
+      let relaysToUse: number[] = [];
+      
+      // For custom effects, use the pattern field to determine relays
+      if (lightingEffect.effectType === 'custom') {
+        if (lightingEffect.pattern && lightingEffect.pattern.length > 0) {
+          relaysToUse = lightingEffect.pattern;
+          effectType = 'SOLID'; // Default to solid for custom patterns
+        } else {
+          // If no pattern defined, use selected relays or all relays
+          relaysToUse = selectedRelays.length > 0 ? selectedRelays : [];
+          effectType = 'SOLID';
+        }
+      } else {
+        // For standard effects, use selected relays if any
+        relaysToUse = selectedRelays;
+        switch (lightingEffect.effectType) {
+          case 'solid': effectType = 'SOLID'; break;
+          case 'strobe': effectType = 'STROBE'; break;
+          case 'chase': effectType = 'CHASE'; break;
+          case 'fade': effectType = 'FADE'; break;
+          case 'random': effectType = 'RANDOM'; break;
+          default: effectType = 'SOLID'; break;
+        }
       }
 
-      // If specific relays are selected, test each one individually
-      if (selectedRelays.length > 0) {
-        console.log('🎛️ Testing specific relays:', selectedRelays);
+      // Use selective effect if specific relays are defined
+      if (relaysToUse.length > 0) {
+        console.log('🎛️ Testing selective effect on relays:', relaysToUse);
+        await api.startSelectiveEffect(effectType, relaysToUse, lightingEffect.interval);
         
-        // Turn on selected relays
-        for (const relay of selectedRelays) {
-          await api.setRelay(relay, 'ON');
-        }
-        
-        // Wait for the effect duration
+        // Stop the effect after the duration
         setTimeout(async () => {
           try {
-            // Turn off selected relays
-            for (const relay of selectedRelays) {
-              await api.setRelay(relay, 'OFF');
-            }
-            console.log('✅ Specific relay test completed');
+            await api.stopEffect();
+            console.log('✅ Selective effect test completed');
           } catch (error) {
-            console.error('❌ Failed to stop specific relay test:', error);
+            console.error('❌ Failed to stop selective effect test:', error);
+          }
+        }, lightingEffect.duration);
+      } else {
+        // Test all relays with the full effect
+        console.log('🎛️ Testing all relays with effect');
+        await api.startEffect(effectType, lightingEffect.interval);
+        
+        // Stop the effect after the duration
+        setTimeout(async () => {
+          try {
+            await api.stopEffect();
+            console.log('✅ Full effect test completed');
+          } catch (error) {
+            console.error('❌ Failed to stop full effect test:', error);
+          }
+        }, lightingEffect.duration);
+      }
+
+      // If specific relays are selected, use selective effect API
+      if (selectedRelays.length > 0) {
+        console.log('🎛️ Testing specific relays with selective effect:', selectedRelays);
+        await api.startSelectiveEffect(effectType, selectedRelays, lightingEffect.interval);
+        
+        // Stop the effect after the duration
+        setTimeout(async () => {
+          try {
+            await api.stopEffect();
+            console.log('✅ Selective effect test completed');
+          } catch (error) {
+            console.error('❌ Failed to stop selective effect test:', error);
           }
         }, lightingEffect.duration);
       } else {
@@ -153,6 +192,183 @@ export const LightingEffectManager: React.FC = () => {
     setConfirmDelete(null);
   };
 
+  const handleExportLibrary = async () => {
+    console.log('🎆 Exporting lighting effects library...');
+    console.log('Lighting effect types count:', lightingEffectTypes.length);
+    
+    try {
+      const exportData = {
+        metadata: {
+          name: "Lighting Effects Library",
+          description: "Complete lighting effects collection",
+          createdAt: new Date().toISOString(),
+          version: "1.0"
+        },
+        lightingEffectTypes,
+        format: "lume-lighting-effects-v1"
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const fileName = `lighting-effects-library-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Check if we're in Tauri environment
+      const isTauri = '__TAURI__' in window;
+      console.log('Is Tauri environment:', isTauri);
+      
+      // In Tauri, use clipboard with good UX
+      if (isTauri) {
+        console.log('Using Tauri-optimized export...');
+        try {
+          await navigator.clipboard.writeText(jsonString);
+          alert(`💡 Export Successful!\n\n📋 Your lighting effects library has been copied to the clipboard.\n\n📝 To save the file:\n1. Open any text editor (TextEdit, Notepad, VS Code, etc.)\n2. Paste the content (Cmd+V or Ctrl+V)\n3. Save as: "${fileName}"\n\nThe file contains ${lightingEffectTypes.length} lighting effects ready for import!`);
+          return;
+        } catch (clipboardError) {
+          console.warn('Clipboard failed in Tauri:', clipboardError);
+        }
+      }
+      
+      // For browsers, try download
+      console.log('Attempting browser download...');
+      try {
+        const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(jsonString)}`;
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        alert(`💡 Export Complete!\n\nDownloaded: ${fileName}\nEffects: ${lightingEffectTypes.length}\n\nYour lighting effects library is ready for sharing!`);
+      } catch (downloadError) {
+        console.warn('Download failed, using fallback modal...', downloadError);
+        // Show modal with content for manual copy
+        showExportModal(jsonString, fileName);
+      }
+    } catch (error) {
+      console.error('❌ Export failed:', error);
+      alert('Failed to export lighting effects library. Please try again.');
+    }
+  };
+
+  const showExportModal = (jsonString: string, fileName: string) => {
+    // Create modal for manual copy (fallback)
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center;
+      z-index: 10000; font-family: system-ui;
+    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: #1f2937; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%;
+      color: white; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    `;
+
+    const header = document.createElement('h2');
+    header.textContent = `💡 Lighting Effects Export - ${fileName}`;
+    header.style.cssText = 'margin: 0 0 15px 0; color: #FF6B35;';
+
+    const instructions = document.createElement('p');
+    instructions.innerHTML = `
+      Copy the content below and save it as <strong>${fileName}</strong>:
+    `;
+    instructions.style.cssText = 'margin-bottom: 15px; color: #e5e7eb;';
+
+    const textarea = document.createElement('textarea');
+    textarea.value = jsonString;
+    textarea.style.cssText = `
+      width: 100%; height: 300px; background: #374151; color: white; border: 1px solid #6b7280;
+      border-radius: 6px; padding: 10px; font-family: monospace; font-size: 12px;
+      resize: vertical;
+    `;
+    textarea.readOnly = true;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 15px; justify-content: flex-end;';
+
+    const copyButton = document.createElement('button');
+    copyButton.style.cssText = `
+      background: #FF6B35; color: white; border: none; padding: 10px 20px;
+      border-radius: 6px; cursor: pointer; font-weight: bold;
+    `;
+    copyButton.textContent = '📋 Copy to Clipboard';
+    copyButton.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(jsonString);
+        copyButton.textContent = '✅ Copied!';
+        copyButton.style.background = '#10b981';
+        setTimeout(() => {
+          copyButton.textContent = '📋 Copy to Clipboard';
+          copyButton.style.background = '#FF6B35';
+        }, 2000);
+      } catch (err) {
+        console.warn('Manual clipboard copy failed:', err);
+        textarea.select();
+        copyButton.textContent = '⚠️ Select & Copy Manually';
+      }
+    };
+
+    const closeButton = document.createElement('button');
+    closeButton.style.cssText = `
+      background: #666; color: white; border: none; padding: 10px 20px;
+      border-radius: 6px; cursor: pointer;
+    `;
+    closeButton.textContent = 'Close';
+    closeButton.onclick = () => {
+      document.body.removeChild(modal);
+    };
+
+    buttonContainer.appendChild(copyButton);
+    buttonContainer.appendChild(closeButton);
+
+    content.appendChild(header);
+    content.appendChild(instructions);
+    content.appendChild(textarea);
+    content.appendChild(buttonContainer);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+  };
+
+  const handleImportLibrary = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      const importData = JSON.parse(content);
+      
+      // Validate format
+      if (importData.format === 'lume-lighting-effects-v1' && importData.lightingEffectTypes) {
+        // Import lighting effects library
+        let importedCount = 0;
+        for (const effectType of importData.lightingEffectTypes) {
+          const existing = lightingEffectTypes.find(et => et.id === effectType.id);
+          if (!existing) {
+            addLightingEffectType(effectType);
+            importedCount++;
+          }
+        }
+        
+        if (importedCount > 0) {
+          alert(`💡 Import Successful!\n\nImported ${importedCount} new lighting effects!\nTotal effects: ${lightingEffectTypes.length + importedCount}`);
+        } else {
+          alert('No new lighting effects to import. All effects already exist.');
+        }
+      } else {
+        alert('Invalid file format. Please select a valid lighting effects library file.');
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Failed to import lighting effects. Please check the file format.');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setFilterCategory('');
@@ -173,13 +389,37 @@ export const LightingEffectManager: React.FC = () => {
           </p>
         </div>
         
-        <button
-          onClick={handleCreateNew}
-          className="flex items-center space-x-2 px-4 py-2 bg-lume-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span>New Effect</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* Import */}
+          <label className="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors cursor-pointer">
+            <Upload className="w-4 h-4" />
+            <span>Import</span>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportLibrary}
+              className="hidden"
+            />
+          </label>
+
+          {/* Export */}
+          <button
+            onClick={handleExportLibrary}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+
+          {/* New Effect */}
+          <button
+            onClick={handleCreateNew}
+            className="flex items-center space-x-2 px-4 py-2 bg-lume-primary hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>New Effect</span>
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}

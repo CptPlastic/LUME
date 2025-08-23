@@ -120,7 +120,9 @@ export class FireworkService {
   // Export show to JSON file
   static exportShow(show: Show, fireworkTypes: FireworkType[], controllers: any[]): ShowFile {
     const usedFireworkTypeIds = new Set(
-      show.sequences.map(seq => seq.fireworkTypeId)
+      show.sequences
+        .filter(seq => seq.fireworkTypeId) // Filter out sequences without fireworkTypeId
+        .map(seq => seq.fireworkTypeId!)   // Use non-null assertion since we filtered
     );
     
     const usedFireworkTypes = fireworkTypes.filter(ft => 
@@ -271,15 +273,16 @@ export class FireworkService {
     const warnings: string[] = [];
     const fireworkMap = new Map(fireworkTypes.map(ft => [ft.id, ft]));
 
-    // Sort sequences by timestamp for safety analysis
-    const sortedSequences = [...show.sequences].sort((a, b) => a.timestamp - b.timestamp);
+    // Sort sequences by timestamp for safety analysis - only firework sequences
+    const fireworkSequences = show.sequences.filter(seq => seq.fireworkTypeId);
+    const sortedSequences = [...fireworkSequences].sort((a, b) => a.timestamp - b.timestamp);
 
     // Check for minimum delays between fireworks
     for (let i = 0; i < sortedSequences.length - 1; i++) {
       const currentSeq = sortedSequences[i];
       const nextSeq = sortedSequences[i + 1];
 
-      const firework = fireworkMap.get(currentSeq.fireworkTypeId);
+      const firework = fireworkMap.get(currentSeq.fireworkTypeId!); // Safe since filtered
       if (firework) {
         const timeDiff = nextSeq.timestamp - currentSeq.timestamp;
         if (timeDiff < firework.safetyDelay) {
@@ -291,13 +294,13 @@ export class FireworkService {
     }
 
     // Check for overlapping high-intensity fireworks
-    const highIntensitySequences = show.sequences.filter(seq => {
-      const firework = fireworkMap.get(seq.fireworkTypeId);
+    const highIntensitySequences = fireworkSequences.filter(seq => {
+      const firework = fireworkMap.get(seq.fireworkTypeId!); // Safe since filtered
       return firework && (firework.intensity === 'high' || firework.intensity === 'extreme');
     });
 
     highIntensitySequences.forEach((sequence) => {
-      const firework = fireworkMap.get(sequence.fireworkTypeId);
+      const firework = fireworkMap.get(sequence.fireworkTypeId!); // Safe since filtered
       if (firework) {
         const overlapping = highIntensitySequences.filter(other => 
           other !== sequence && 

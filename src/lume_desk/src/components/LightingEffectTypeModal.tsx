@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Palette, Zap, Clock } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import type { LightingEffectType } from '../types';
 import { LightingEffectService } from '../services/lighting-effect-service';
 

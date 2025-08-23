@@ -30,6 +30,7 @@ interface LumeStoreImpl extends LumeStore {
   toggleRelay: (controllerId: string, relay: number) => Promise<boolean>;
   setAllRelays: (controllerId: string, state: 'ON' | 'OFF') => Promise<boolean>;
   startLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number) => Promise<boolean>;
+  startSelectiveLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number) => Promise<boolean>;
   stopLightingEffect: (controllerId: string) => Promise<boolean>;
   getLightingStatus: (controllerId: string) => Promise<any>;
   
@@ -324,6 +325,24 @@ export const useLumeStore = create<LumeStoreImpl>()(
             return result.success;
           } catch (error) {
             console.error(`Failed to start effect ${effect} on controller ${controllerId}:`, error);
+            if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
+              get().updateControllerStatus(controllerId, { status: 'disconnected' });
+            }
+            return false;
+          }
+        },
+
+        startSelectiveLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number): Promise<boolean> => {
+          const { apis } = get();
+          const api = apis.get(controllerId);
+          
+          if (!api) return false;
+          
+          try {
+            const result = await api.startSelectiveEffect(effect, relays, interval);
+            return result.success;
+          } catch (error) {
+            console.error(`Failed to start selective effect ${effect} on relays ${relays.join(',')} for controller ${controllerId}:`, error);
             if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('ECONNABORTED'))) {
               get().updateControllerStatus(controllerId, { status: 'disconnected' });
             }
@@ -899,6 +918,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           controllers: state.controllers,
           currentShow: state.currentShow,
           fireworkTypes: state.fireworkTypes,
+          lightingEffectTypes: state.lightingEffectTypes,
         }),
         // Convert string dates back to Date objects after rehydration
         onRehydrateStorage: () => (state) => {

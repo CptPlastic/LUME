@@ -1,5 +1,5 @@
 // Enhanced audio storage service for persisting uploaded audio files
-import type { AudioTrack, Show, ShowFile } from '../types';
+import type { AudioTrack } from '../types';
 
 const DB_NAME = 'LumeAudioStorage';
 const DB_VERSION = 2;

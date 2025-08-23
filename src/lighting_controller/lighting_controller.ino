@@ -98,6 +98,10 @@ unsigned long effectInterval = 1000; // milliseconds
 unsigned long lastEffectUpdate = 0;
 int effectStep = 0;
 
+// Selective relay effects - NEW
+bool selectiveMode = false;
+bool selectedRelays[12] = {false}; // Track which relays are selected for effects
+
 // Status LED functions
 void setStatusLED(bool red, bool green) {
   digitalWrite(STATUS_LED_RED, red ? HIGH : LOW);
@@ -114,11 +118,28 @@ void setRelay(int relay, bool state) {
 }
 
 void setAllRelays(bool state) {
-  Serial.println("Setting all relays to " + String(state ? "ON" : "OFF"));
   for (int i = 0; i < 12; i++) {
     digitalWrite(relayPins[i], state ? HIGH : LOW);
     relayStates[i] = state;
   }
+}
+
+// NEW: Set only selected relays
+void setSelectedRelays(bool state) {
+  for (int i = 0; i < 12; i++) {
+    if (selectedRelays[i]) {
+      digitalWrite(relayPins[i], state ? HIGH : LOW);
+      relayStates[i] = state;
+    }
+  }
+}
+
+// NEW: Clear relay selection
+void clearSelectedRelays() {
+  for (int i = 0; i < 12; i++) {
+    selectedRelays[i] = false;
+  }
+  selectiveMode = false;
 }
 
 void setAllRelaysSafe() {
@@ -135,15 +156,48 @@ void setAllRelaysSafe() {
 // Lighting effect functions
 void runStrobeEffect() {
   if (millis() - lastEffectUpdate >= effectInterval) {
-    setAllRelays(!relayStates[0]); // Toggle all relays
+    if (selectiveMode) {
+      // Toggle only selected relays
+      bool newState = !relayStates[0]; // Use first relay as reference
+      for (int i = 0; i < 12; i++) {
+        if (selectedRelays[i]) {
+          setSelectedRelays(newState);
+          break; // All selected relays get the same state
+        }
+      }
+    } else {
+      setAllRelays(!relayStates[0]); // Toggle all relays
+    }
     lastEffectUpdate = millis();
   }
 }
 
 void runChaseEffect() {
   if (millis() - lastEffectUpdate >= effectInterval) {
-    setAllRelays(false);
-    setRelay((effectStep % 12) + 1, true);
+    if (selectiveMode) {
+      // Chase only among selected relays
+      setAllRelays(false); // Turn off all first
+      int selectedCount = 0;
+      for (int i = 0; i < 12; i++) {
+        if (selectedRelays[i]) selectedCount++;
+      }
+      if (selectedCount > 0) {
+        int targetIndex = effectStep % selectedCount;
+        int currentSelected = 0;
+        for (int i = 0; i < 12; i++) {
+          if (selectedRelays[i]) {
+            if (currentSelected == targetIndex) {
+              setRelay(i + 1, true);
+              break;
+            }
+            currentSelected++;
+          }
+        }
+      }
+    } else {
+      setAllRelays(false);
+      setRelay((effectStep % 12) + 1, true);
+    }
     effectStep++;
     lastEffectUpdate = millis();
   }
@@ -153,19 +207,54 @@ void runFadeEffect() {
   // For relays, we'll simulate fade with timed on/off patterns
   if (millis() - lastEffectUpdate >= (effectInterval / 10)) {
     int fadeLevel = (effectStep % 20);
-    if (fadeLevel < 10) {
-      // Fade up
-      int onRelays = (fadeLevel * 12) / 10;
-      setAllRelays(false);
-      for (int i = 0; i < onRelays; i++) {
-        setRelay(i + 1, true);
+    if (selectiveMode) {
+      // Fade only selected relays
+      setAllRelays(false); // Turn off all first
+      if (fadeLevel < 10) {
+        // Fade up
+        int selectedCount = 0;
+        for (int i = 0; i < 12; i++) {
+          if (selectedRelays[i]) selectedCount++;
+        }
+        int onRelays = (fadeLevel * selectedCount) / 10;
+        int currentSelected = 0;
+        for (int i = 0; i < 12 && currentSelected < onRelays; i++) {
+          if (selectedRelays[i]) {
+            setRelay(i + 1, true);
+            currentSelected++;
+          }
+        }
+      } else {
+        // Fade down
+        int selectedCount = 0;
+        for (int i = 0; i < 12; i++) {
+          if (selectedRelays[i]) selectedCount++;
+        }
+        int onRelays = ((20 - fadeLevel) * selectedCount) / 10;
+        int currentSelected = 0;
+        for (int i = 0; i < 12 && currentSelected < onRelays; i++) {
+          if (selectedRelays[i]) {
+            setRelay(i + 1, true);
+            currentSelected++;
+          }
+        }
       }
     } else {
-      // Fade down
-      int onRelays = ((20 - fadeLevel) * 12) / 10;
-      setAllRelays(false);
-      for (int i = 0; i < onRelays; i++) {
-        setRelay(i + 1, true);
+      // Original fade effect for all relays
+      if (fadeLevel < 10) {
+        // Fade up
+        int onRelays = (fadeLevel * 12) / 10;
+        setAllRelays(false);
+        for (int i = 0; i < onRelays; i++) {
+          setRelay(i + 1, true);
+        }
+      } else {
+        // Fade down
+        int onRelays = ((20 - fadeLevel) * 12) / 10;
+        setAllRelays(false);
+        for (int i = 0; i < onRelays; i++) {
+          setRelay(i + 1, true);
+        }
       }
     }
     effectStep++;
@@ -175,8 +264,17 @@ void runFadeEffect() {
 
 void runRandomEffect() {
   if (millis() - lastEffectUpdate >= effectInterval) {
-    for (int i = 0; i < 12; i++) {
-      setRelay(i + 1, random(0, 2) == 1);
+    if (selectiveMode) {
+      // Random only among selected relays
+      for (int i = 0; i < 12; i++) {
+        if (selectedRelays[i]) {
+          setRelay(i + 1, random(0, 2) == 1);
+        }
+      }
+    } else {
+      for (int i = 0; i < 12; i++) {
+        setRelay(i + 1, random(0, 2) == 1);
+      }
     }
     lastEffectUpdate = millis();
   }
@@ -660,7 +758,11 @@ void setupAPI() {
       unsigned long interval = server.hasArg("interval") ? server.arg("interval").toInt() : 1000;
       
       if (effectType == "SOLID") {
-        setAllRelays(true);
+        if (selectiveMode) {
+          setSelectedRelays(true);
+        } else {
+          setAllRelays(true);
+        }
         startEffect(EFFECT_SOLID, "Solid On");
       } else if (effectType == "STROBE") {
         startEffect(EFFECT_STROBE, "Strobe", interval > 0 ? interval : 500);
@@ -675,9 +777,60 @@ void setupAPI() {
         return;
       }
       
-      server.send(200, "application/json", "{\"success\":true,\"effect\":\"" + effectType + "\",\"interval\":" + String(interval) + "}");
+      server.send(200, "application/json", "{\"success\":true,\"effect\":\"" + effectType + "\",\"interval\":" + String(interval) + ",\"selective\":" + String(selectiveMode ? "true" : "false") + "}");
     } else {
       server.send(400, "application/json", "{\"error\":\"Missing effect type\"}");
+    }
+  });
+
+  // NEW: POST /effect/selective - Start lighting effect on selected relays only
+  server.on("/effect/selective", HTTP_POST, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    if (server.hasArg("type") && server.hasArg("relays")) {
+      String effectType = server.arg("type");
+      effectType.toUpperCase();
+      String relaysParam = server.arg("relays");
+      unsigned long interval = server.hasArg("interval") ? server.arg("interval").toInt() : 1000;
+      
+      // Parse relay list (comma-separated: "1,3,5,7")
+      clearSelectedRelays();
+      selectiveMode = true;
+      
+      int relayIndex = 0;
+      int commaIndex = 0;
+      while (commaIndex != -1) {
+        commaIndex = relaysParam.indexOf(',', relayIndex);
+        String relayStr = (commaIndex != -1) ? relaysParam.substring(relayIndex, commaIndex) : relaysParam.substring(relayIndex);
+        relayStr.trim();
+        
+        int relay = relayStr.toInt();
+        if (relay >= 1 && relay <= 12) {
+          selectedRelays[relay - 1] = true;
+        }
+        
+        relayIndex = commaIndex + 1;
+      }
+      
+      // Start the effect
+      if (effectType == "SOLID") {
+        setSelectedRelays(true);
+        startEffect(EFFECT_SOLID, "Selective Solid");
+      } else if (effectType == "STROBE") {
+        startEffect(EFFECT_STROBE, "Selective Strobe", interval > 0 ? interval : 500);
+      } else if (effectType == "CHASE") {
+        startEffect(EFFECT_CHASE, "Selective Chase", interval > 0 ? interval : 200);
+      } else if (effectType == "FADE") {
+        startEffect(EFFECT_FADE, "Selective Fade", interval > 0 ? interval : 100);
+      } else if (effectType == "RANDOM") {
+        startEffect(EFFECT_RANDOM, "Selective Random", interval > 0 ? interval : 300);
+      } else {
+        server.send(400, "application/json", "{\"error\":\"Invalid effect type. Use: SOLID, STROBE, CHASE, FADE, RANDOM\"}");
+        return;
+      }
+      
+      server.send(200, "application/json", "{\"success\":true,\"effect\":\"" + effectType + "\",\"relays\":\"" + relaysParam + "\",\"interval\":" + String(interval) + "}");
+    } else {
+      server.send(400, "application/json", "{\"error\":\"Missing effect type or relays parameter\"}");
     }
   });
   
@@ -685,6 +838,7 @@ void setupAPI() {
   server.on("/effect/stop", HTTP_POST, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     stopEffect();
+    clearSelectedRelays(); // Clear selective mode when stopping
     server.send(200, "application/json", "{\"success\":true,\"message\":\"Effect stopped\"}");
   });
   

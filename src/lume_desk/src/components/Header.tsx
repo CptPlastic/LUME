@@ -17,6 +17,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
     scanForControllers 
   } = useLumeStore();
 
+  const [iconError, setIconError] = React.useState(false);
+
   const activeControllerData = controllers.find(c => c.id === activeController);
   const connectedCount = controllers.filter(c => c.status === 'connected').length;
 
@@ -43,8 +45,18 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
         {/* Logo and Title */}
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <Zap className="w-8 h-8 text-lume-primary" />
-            <h1 className="text-2xl font-bold text-white">LUME</h1>
+            {/* App Icon with fallback */}
+            {!iconError ? (
+              <img 
+                src="/icons/128x128.png" 
+                alt="LUME Logo" 
+                className="w-8 h-8"
+                onError={() => setIconError(true)}
+              />
+            ) : (
+              <Zap className="w-8 h-8 text-lume-primary" />
+            )}
+            <h1 className="text-2xl font-bold text-lume-primary">LUME</h1>
           </div>
           <div className="text-sm text-gray-400">
             Desktop Controller v1.2.0

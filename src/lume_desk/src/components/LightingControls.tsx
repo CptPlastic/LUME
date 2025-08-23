@@ -20,6 +20,7 @@ export const LightingControls: React.FC<LightingControlsProps> = ({ controllerId
     toggleRelay,
     setAllRelays,
     startLightingEffect,
+    startSelectiveLightingEffect,
     stopLightingEffect,
     getLightingStatus
   } = useLumeStore();
@@ -92,7 +93,19 @@ export const LightingControls: React.FC<LightingControlsProps> = ({ controllerId
   const handleStartEffect = async (effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM') => {
     setIsUpdating(true);
     try {
-      await startLightingEffect(controllerId, effectType);
+      // Check if any relays are currently on (selective mode)
+      const activeRelays = relayStates
+        .map((isOn, index) => isOn ? index + 1 : null)
+        .filter((relay): relay is number => relay !== null);
+      
+      if (activeRelays.length > 0 && activeRelays.length < 12) {
+        // Use selective effect for currently active relays
+        console.log('🎛️ Starting selective effect on active relays:', activeRelays);
+        await startSelectiveLightingEffect(controllerId, effectType, activeRelays);
+      } else {
+        // Use regular effect for all relays
+        await startLightingEffect(controllerId, effectType);
+      }
       setCurrentEffect(effectType.toLowerCase());
     } catch (error) {
       console.error('Failed to start effect:', error);

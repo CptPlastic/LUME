@@ -10,8 +10,7 @@ export const FireworkTypeManager: React.FC = () => {
     fireworkTypes, 
     addFireworkType, 
     updateFireworkType, 
-    removeFireworkType,
-    importShow 
+    removeFireworkType
   } = useLumeStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -317,77 +316,37 @@ export const FireworkTypeManager: React.FC = () => {
     document.addEventListener('keydown', handleEscape);
   };
 
-  const handleImportLibrary = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const handleImportFireworks = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
       try {
-        const jsonContent = e.target?.result as string;
-        const importData = JSON.parse(jsonContent);
-        console.log('Import data received:', importData);
+        const content = await file.text();
+        const importedFireworkTypes: FireworkType[] = JSON.parse(content);
         
-        if (importData.metadata && importData.fireworkTypes) {
-          handleFireworkLibraryImport(importData);
-        } else if (importData.format === 'lume-show-v1') {
-          handleShowFormatImport(importData);
-        } else {
-          console.warn('Unknown import format:', importData);
-          alert('❌ Unsupported file format. Please make sure this is a valid LUME firework types or show file.');
+        // Import each firework type
+        let importedCount = 0;
+        for (const fireworkType of importedFireworkTypes) {
+          const existing = fireworkTypes.find(ft => ft.id === fireworkType.id);
+          if (!existing) {
+            addFireworkType(fireworkType);
+            importedCount++;
+          }
         }
         
+        if (importedCount > 0) {
+          alert(`Successfully imported ${importedCount} firework types!`);
+        } else {
+          alert('No new firework types to import. All types already exist.');
+        }
       } catch (error) {
         console.error('Import failed:', error);
-        alert(`❌ Import failed: ${error instanceof Error ? error.message : 'Invalid JSON format'}\n\nPlease check that the file is a valid JSON file exported from LUME.`);
+        alert('Failed to import firework types. Please check the file format.');
       }
+      
+      // Reset file input
+      event.target.value = '';
     };
-    reader.readAsText(file);
-    
-    // Reset input
-    event.target.value = '';
-  };
-
-  const handleFireworkLibraryImport = (importData: any) => {
-    console.log('Detected LUME firework library format');
-    
-    let importedCount = 0;
-    let skippedCount = 0;
-    
-    importData.fireworkTypes.forEach((fireworkType: any) => {
-      try {
-        const existing = fireworkTypes.find(ft => ft.id === fireworkType.id);
-        
-        if (existing) {
-          updateFireworkType(fireworkType.id, fireworkType);
-          console.log(`Updated firework type: ${fireworkType.name}`);
-        } else {
-          addFireworkType(fireworkType);
-          console.log(`Added firework type: ${fireworkType.name}`);
-        }
-        importedCount++;
-      } catch (error) {
-        console.warn(`Failed to import firework type ${fireworkType.name}:`, error);
-        skippedCount++;
-      }
-    });
-    
-    console.log(`Import completed: ${importedCount} imported, ${skippedCount} skipped`);
-    
-    alert(`🎆 Import Successful!\n\n📊 Results:\n• ${importedCount} firework types imported\n• ${skippedCount} skipped (errors)\n• Total in library: ${fireworkTypes.length + importedCount - skippedCount}\n\n${importData.metadata.name || 'Firework Types'} has been imported!`);
-  };
-
-  const handleShowFormatImport = (importData: any) => {
-    console.log('Detected LUME show format, using store import');
-    
-    const success = importShow(importData);
-    
-    if (success) {
-      alert('🎆 Show and firework types imported successfully!');
-    } else {
-      alert('❌ Failed to import show. Please check the file format.');
-    }
-  };
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -416,7 +375,7 @@ export const FireworkTypeManager: React.FC = () => {
             <input
               type="file"
               accept=".json"
-              onChange={handleImportLibrary}
+              onChange={handleImportFireworks}
               className="hidden"
             />
           </label>
