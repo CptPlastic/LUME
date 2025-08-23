@@ -36,7 +36,7 @@ export interface RelayStatus {
 }
 
 export interface LightingEffect {
-  type: 'solid' | 'strobe' | 'chase' | 'fade' | 'random';
+  type: 'solid' | 'strobe' | 'chase' | 'wave' | 'random';
   name: string;
   running: boolean;
   interval?: number; // milliseconds
@@ -103,10 +103,10 @@ export interface FireworkType {
 export interface LightingEffectType {
   id: string;
   name: string;
-  category: 'mood' | 'party' | 'strobe' | 'chase' | 'fade' | 'pattern' | 'special';
+  category: 'mood' | 'party' | 'strobe' | 'chase' | 'wave' | 'pattern' | 'special';
   duration: number; // milliseconds - how long the effect runs
   intensity: 'low' | 'medium' | 'high' | 'extreme';
-  effectType: 'solid' | 'strobe' | 'chase' | 'fade' | 'random' | 'custom';
+  effectType: 'solid' | 'strobe' | 'chase' | 'wave' | 'random' | 'custom';
   colors: string[]; // hex colors or names for visual representation
   interval?: number; // milliseconds - for effects like strobe/chase
   pattern?: number[]; // relay pattern for custom effects [1,2,3] = activate relays 1,2,3

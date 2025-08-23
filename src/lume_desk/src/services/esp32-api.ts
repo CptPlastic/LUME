@@ -107,7 +107,7 @@ export class ESP32API {
   }
 
   // Lighting effects
-  async startEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number): Promise<APIResponse> {
+  async startEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', interval?: number): Promise<APIResponse> {
     const params = new URLSearchParams({ type });
     if (interval) {
       params.append('interval', interval.toString());
@@ -117,7 +117,7 @@ export class ESP32API {
   }
 
   // NEW: Start lighting effect on specific relays only
-  async startSelectiveEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number): Promise<APIResponse> {
+  async startSelectiveEffect(type: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', relays: number[], interval?: number): Promise<APIResponse> {
     const params = new URLSearchParams({ 
       type,
       relays: relays.join(',')
@@ -125,7 +125,9 @@ export class ESP32API {
     if (interval) {
       params.append('interval', interval.toString());
     }
+    console.log('🎛️ Starting selective effect:', type, 'on relays:', relays, 'URL:', `/effect/selective?${params.toString()}`);
     const response = await this.client.post(`/effect/selective?${params.toString()}`);
+    console.log('🎛️ Selective effect response:', response.data);
     return response.data;
   }
 

@@ -90,7 +90,7 @@ export const LightingControls: React.FC<LightingControlsProps> = ({ controllerId
     }
   };
 
-  const handleStartEffect = async (effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM') => {
+  const handleStartEffect = async (effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM') => {
     setIsUpdating(true);
     try {
       // Check if any relays are currently on (selective mode)
@@ -233,12 +233,12 @@ export const LightingControls: React.FC<LightingControlsProps> = ({ controllerId
           </button>
           
           <button
-            onClick={() => handleStartEffect('FADE')}
+            onClick={() => handleStartEffect('WAVE')}
             disabled={isUpdating}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors flex items-center justify-center space-x-1 ${getEffectButtonClass('fade')}`}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors flex items-center justify-center space-x-1 ${getEffectButtonClass('wave')}`}
           >
             <Sparkles className="w-3 h-3" />
-            <span>Fade</span>
+            <span>Wave</span>
           </button>
           
           <button

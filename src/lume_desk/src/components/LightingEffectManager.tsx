@@ -23,6 +23,7 @@ export const LightingEffectManager: React.FC = () => {
 
   const handleTestLightingEffect = async (lightingEffect: LightingEffectType) => {
     console.log('🧪 Testing lighting effect:', lightingEffect.name);
+    console.log('🔍 Full effect object:', lightingEffect);
     
     if (!selectedController) {
       alert('Please select a lighting controller first');
@@ -42,84 +43,73 @@ export const LightingEffectManager: React.FC = () => {
 
     try {
       const api = new ESP32API(`http://${controller.ip}`);
+      console.log('🔗 API created for controller:', controller.ip);
       
-            // Map lighting effect type to ESP32 effect type
-      let effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
+      // Map lighting effect type to ESP32 effect type
+      let effectType: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM';
       let relaysToUse: number[] = [];
       
-      // For custom effects, use the pattern field to determine relays
-      if (lightingEffect.effectType === 'custom') {
-        if (lightingEffect.pattern && lightingEffect.pattern.length > 0) {
-          relaysToUse = lightingEffect.pattern;
-          effectType = 'SOLID'; // Default to solid for custom patterns
-        } else {
-          // If no pattern defined, use selected relays or all relays
-          relaysToUse = selectedRelays.length > 0 ? selectedRelays : [];
-          effectType = 'SOLID';
-        }
+      // Check if this effect has a custom pattern (relay selection)
+      console.log('🔍 Effect pattern:', lightingEffect.pattern);
+      console.log('🔍 Pattern type:', typeof lightingEffect.pattern);
+      console.log('🔍 Pattern length:', lightingEffect.pattern?.length);
+      
+      if (lightingEffect.pattern && lightingEffect.pattern.length > 0) {
+        // Pattern is already a number array
+        relaysToUse = lightingEffect.pattern;
+        console.log('🎯 Effect has pattern - using relays:', relaysToUse);
       } else {
-        // For standard effects, use selected relays if any
+        // Use selected relays if any, otherwise all relays
         relaysToUse = selectedRelays;
-        switch (lightingEffect.effectType) {
-          case 'solid': effectType = 'SOLID'; break;
-          case 'strobe': effectType = 'STROBE'; break;
-          case 'chase': effectType = 'CHASE'; break;
-          case 'fade': effectType = 'FADE'; break;
-          case 'random': effectType = 'RANDOM'; break;
-          default: effectType = 'SOLID'; break;
-        }
+        console.log('🎯 No pattern - using selected relays:', selectedRelays);
       }
 
-      // Use selective effect if specific relays are defined
+      // Map effect type
+      switch (lightingEffect.effectType) {
+        case 'solid': effectType = 'SOLID'; break;
+        case 'strobe': effectType = 'STROBE'; break;
+        case 'chase': effectType = 'CHASE'; break;
+        case 'wave': effectType = 'WAVE'; break;
+        case 'random': effectType = 'RANDOM'; break;
+        case 'custom': effectType = 'STROBE'; break; // Default custom to strobe
+        default: effectType = 'SOLID'; break;
+      }
+
+
+      // Use manual relay control approach (Case 2) - more reliable
       if (relaysToUse.length > 0) {
-        console.log('🎛️ Testing selective effect on relays:', relaysToUse);
-        await api.startSelectiveEffect(effectType, relaysToUse, lightingEffect.interval);
+        console.log('🔘 Custom effect: using manual relay control approach');
+        console.log('   📍 Effect Type:', effectType);
+        console.log('   📍 Target Relays:', relaysToUse);
+        console.log('   📍 Interval:', lightingEffect.interval);
+        console.log('   📍 Duration:', lightingEffect.duration);
         
-        // Stop the effect after the duration
+        console.log('🚀 Step 1: Turn off all relays...');
+        await api.setAllRelays('OFF');
+        
+        console.log('🚀 Step 2: Turn on target relays...');
+        for (const relay of relaysToUse) {
+          console.log('   🔗 Turning on relay:', relay);
+          await api.setRelay(relay, 'ON');
+        }
+        
+        console.log('🚀 Step 3: Starting regular effect...');
+        await api.startEffect(effectType, lightingEffect.interval);
+        console.log('✅ Effect started successfully');
+        
         setTimeout(async () => {
           try {
+            console.log('⏰ Stopping effect after duration...');
             await api.stopEffect();
-            console.log('✅ Selective effect test completed');
+            console.log('✅ Custom effect test completed');
           } catch (error) {
-            console.error('❌ Failed to stop selective effect test:', error);
+            console.error('❌ Failed to stop custom effect test:', error);
           }
         }, lightingEffect.duration);
       } else {
-        // Test all relays with the full effect
-        console.log('🎛️ Testing all relays with effect');
+        // No pattern: use normal effect logic (all relays)
+        console.log('🎛️ Testing all relays with effect:', effectType);
         await api.startEffect(effectType, lightingEffect.interval);
-        
-        // Stop the effect after the duration
-        setTimeout(async () => {
-          try {
-            await api.stopEffect();
-            console.log('✅ Full effect test completed');
-          } catch (error) {
-            console.error('❌ Failed to stop full effect test:', error);
-          }
-        }, lightingEffect.duration);
-      }
-
-      // If specific relays are selected, use selective effect API
-      if (selectedRelays.length > 0) {
-        console.log('🎛️ Testing specific relays with selective effect:', selectedRelays);
-        await api.startSelectiveEffect(effectType, selectedRelays, lightingEffect.interval);
-        
-        // Stop the effect after the duration
-        setTimeout(async () => {
-          try {
-            await api.stopEffect();
-            console.log('✅ Selective effect test completed');
-          } catch (error) {
-            console.error('❌ Failed to stop selective effect test:', error);
-          }
-        }, lightingEffect.duration);
-      } else {
-        // Test all relays with the full effect
-        console.log('🎛️ Testing all relays with effect');
-        await api.startEffect(effectType, lightingEffect.interval);
-        
-        // Stop the effect after the duration
         setTimeout(async () => {
           try {
             await api.stopEffect();

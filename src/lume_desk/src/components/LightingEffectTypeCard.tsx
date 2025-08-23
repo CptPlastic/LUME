@@ -48,7 +48,7 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
       case 'party': return <Zap className="w-4 h-4" />;
       case 'strobe': return <Flashlight className="w-4 h-4" />;
       case 'chase': return <Zap className="w-4 h-4" />;
-      case 'fade': return <Lightbulb className="w-4 h-4" />;
+      case 'wave': return <Lightbulb className="w-4 h-4" />;
       case 'pattern': return <Zap className="w-4 h-4" />;
       case 'special': return <Lightbulb className="w-4 h-4" />;
       default: return <Lightbulb className="w-4 h-4" />;
@@ -61,7 +61,7 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
       case 'party': return 'text-purple-400 bg-purple-400/10';
       case 'strobe': return 'text-yellow-400 bg-yellow-400/10';
       case 'chase': return 'text-green-400 bg-green-400/10';
-      case 'fade': return 'text-indigo-400 bg-indigo-400/10';
+      case 'wave': return 'text-indigo-400 bg-indigo-400/10';
       case 'pattern': return 'text-cyan-400 bg-cyan-400/10';
       case 'special': return 'text-pink-400 bg-pink-400/10';
       default: return 'text-gray-400 bg-gray-400/10';

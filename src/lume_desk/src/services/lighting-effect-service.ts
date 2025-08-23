@@ -126,31 +126,31 @@ export class LightingEffectService {
         relayCount: 12
       },
 
-      // Fade effects
+      // Wave effects
       {
-        id: 'fade-gentle',
-        name: 'Gentle Fade',
-        category: 'fade',
+        id: 'wave-gentle',
+        name: 'Gentle Wave',
+        category: 'wave',
         duration: 90000, // 1.5 minutes
         intensity: 'low',
-        effectType: 'fade',
-        colors: ['#e6e6fa'],
-        interval: 2000, // 2 second fade cycles
-        description: 'Gentle fade in and out',
-        tags: ['fade', 'gentle', 'relaxing'],
+        effectType: 'wave',
+        colors: ['#87ceeb'],
+        interval: 800, // 0.8 second wave cycles
+        description: 'Gentle wave flowing across relays',
+        tags: ['wave', 'gentle', 'flowing'],
         relayCount: 12
       },
       {
-        id: 'fade-dramatic',
-        name: 'Dramatic Fade',
-        category: 'fade',
+        id: 'wave-dramatic',
+        name: 'Dramatic Wave',
+        category: 'wave',
         duration: 60000, // 1 minute
         intensity: 'high',
-        effectType: 'fade',
-        colors: ['#800080'],
-        interval: 1000, // 1 second fade cycles
-        description: 'Dramatic fade with strong contrast',
-        tags: ['fade', 'dramatic', 'contrast'],
+        effectType: 'wave',
+        colors: ['#4682b4'],
+        interval: 400, // 0.4 second wave cycles
+        description: 'Fast dramatic wave with strong visual impact',
+        tags: ['wave', 'dramatic', 'fast'],
         relayCount: 12
       },
 
@@ -245,7 +245,7 @@ export class LightingEffectService {
         category: 'special',
         duration: 180000, // 3 minutes
         intensity: 'medium',
-        effectType: 'fade',
+        effectType: 'wave',
         colors: ['#ff6347', '#ffa500', '#ffff00'],
         interval: 5000, // 5 second fade steps
         description: 'Gradually brightening sunrise effect',
@@ -323,7 +323,7 @@ export class LightingEffectService {
       { value: 'party', label: 'Party Effects', description: 'High-energy party lighting' },
       { value: 'strobe', label: 'Strobe Effects', description: 'Flashing and pulsing patterns' },
       { value: 'chase', label: 'Chase Effects', description: 'Sequential movement patterns' },
-      { value: 'fade', label: 'Fade Effects', description: 'Gradual brightness changes' },
+      { value: 'wave', label: 'Wave Effects', description: 'Flowing wave-like patterns' },
       { value: 'pattern', label: 'Pattern Effects', description: 'Structured relay patterns' },
       { value: 'special', label: 'Special Effects', description: 'Unique and themed effects' }
     ];
@@ -349,7 +349,7 @@ export class LightingEffectService {
       { value: 'solid', label: 'Solid', description: 'All lights on continuously' },
       { value: 'strobe', label: 'Strobe', description: 'Flashing on/off pattern' },
       { value: 'chase', label: 'Chase', description: 'Sequential relay activation' },
-      { value: 'fade', label: 'Fade', description: 'Gradual brightness changes' },
+      { value: 'wave', label: 'Wave', description: 'Flowing wave-like patterns' },
       { value: 'random', label: 'Random', description: 'Unpredictable patterns' },
       { value: 'custom', label: 'Custom', description: 'User-defined relay patterns' }
     ];

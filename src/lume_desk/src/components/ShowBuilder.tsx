@@ -266,6 +266,39 @@ export const ShowBuilder: React.FC = () => {
   const [effectTab, setEffectTab] = useState<'fireworks' | 'lighting'>('fireworks');
   const [sequenceTime, setSequenceTime] = useState(0);
   const [selectedController, setSelectedController] = useState('');
+  
+  // Auto-select appropriate controller when switching effect types
+  useEffect(() => {
+    if (effectTab === 'fireworks') {
+      // Auto-select first firework controller
+      const fireworkController = controllers.find(c => c.type === 'firework');
+      if (fireworkController && selectedController !== fireworkController.id) {
+        setSelectedController(fireworkController.id);
+        console.log('🎆 Auto-selected firework controller:', fireworkController.name);
+      }
+    } else if (effectTab === 'lighting') {
+      // Auto-select first lighting controller  
+      const lightingController = controllers.find(c => c.type === 'lights');
+      if (lightingController && selectedController !== lightingController.id) {
+        setSelectedController(lightingController.id);
+        console.log('💡 Auto-selected lighting controller:', lightingController.name);
+      }
+    }
+  }, [effectTab, controllers, selectedController]);
+  
+  // Initialize with appropriate controller on first load
+  useEffect(() => {
+    if (!selectedController && controllers.length > 0) {
+      const defaultController = effectTab === 'fireworks' 
+        ? controllers.find(c => c.type === 'firework')
+        : controllers.find(c => c.type === 'lights');
+        
+      if (defaultController) {
+        setSelectedController(defaultController.id);
+        console.log('🎯 Initial controller selection:', defaultController.name);
+      }
+    }
+  }, [controllers, selectedController, effectTab]);
   const [selectedArea, setSelectedArea] = useState(1);
   const [selectedChannel, setSelectedChannel] = useState(1);
   const [selectedRelays, setSelectedRelays] = useState<number[]>([]);

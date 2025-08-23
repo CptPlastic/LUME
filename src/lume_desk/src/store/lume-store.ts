@@ -29,8 +29,8 @@ interface LumeStoreImpl extends LumeStore {
   // Lighting controller actions
   toggleRelay: (controllerId: string, relay: number) => Promise<boolean>;
   setAllRelays: (controllerId: string, state: 'ON' | 'OFF') => Promise<boolean>;
-  startLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number) => Promise<boolean>;
-  startSelectiveLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number) => Promise<boolean>;
+  startLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', interval?: number) => Promise<boolean>;
+  startSelectiveLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', relays: number[], interval?: number) => Promise<boolean>;
   stopLightingEffect: (controllerId: string) => Promise<boolean>;
   getLightingStatus: (controllerId: string) => Promise<any>;
   
@@ -314,7 +314,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }
         },
 
-        startLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', interval?: number): Promise<boolean> => {
+        startLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', interval?: number): Promise<boolean> => {
           const { apis } = get();
           const api = apis.get(controllerId);
           
@@ -332,14 +332,29 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }
         },
 
-        startSelectiveLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM', relays: number[], interval?: number): Promise<boolean> => {
+        startSelectiveLightingEffect: async (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', relays: number[], interval?: number): Promise<boolean> => {
           const { apis } = get();
           const api = apis.get(controllerId);
           
           if (!api) return false;
           
           try {
-            const result = await api.startSelectiveEffect(effect, relays, interval);
+            // Use manual approach like LightingEffectManager (more reliable than selective endpoint)
+            console.log('🔘 Starting selective lighting effect using manual approach');
+            console.log('   📍 Effect:', effect);
+            console.log('   📍 Target Relays:', relays);
+            console.log('   📍 Controller:', controllerId);
+            
+            // Step 1: Turn off all relays
+            await api.setAllRelays('OFF');
+            
+            // Step 2: Turn on target relays
+            for (const relay of relays) {
+              await api.setRelay(relay, 'ON');
+            }
+            
+            // Step 3: Start regular effect (which respects currently ON relays)
+            const result = await api.startEffect(effect, interval);
             return result.success;
           } catch (error) {
             console.error(`Failed to start selective effect ${effect} on relays ${relays.join(',')} for controller ${controllerId}:`, error);
@@ -718,13 +733,34 @@ export const useLumeStore = create<LumeStoreImpl>()(
                     console.error(`❌ Failed to fire ${sequence.fireworkType?.name}`);
                   }
                 } else if (sequence.type === 'lighting' && sequence.lightingEffectType) {
-                  // Start lighting effect
-                  const effect = sequence.lightingEffectType.effectType.toUpperCase() as 'SOLID' | 'STROBE' | 'CHASE' | 'FADE' | 'RANDOM';
-                  const success = await get().startLightingEffect(
-                    sequence.controllerId, 
-                    effect, 
-                    sequence.lightingEffectType.interval
-                  );
+                  // Start lighting effect with proper relay targeting
+                  const effect = sequence.lightingEffectType.effectType.toUpperCase() as 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM';
+                  
+                  let success: boolean;
+                  
+                  // Check if lighting effect has a pattern (specific relays) or sequence overrides relays
+                  const targetRelays = sequence.relays && sequence.relays.length > 0 
+                    ? sequence.relays 
+                    : sequence.lightingEffectType.pattern;
+                  
+                  if (targetRelays && targetRelays.length > 0) {
+                    // Use selective lighting effect for specific relays
+                    console.log(`🎯 Starting selective lighting effect "${sequence.lightingEffectType.name}" on relays:`, targetRelays);
+                    success = await get().startSelectiveLightingEffect(
+                      sequence.controllerId, 
+                      effect, 
+                      targetRelays,
+                      sequence.lightingEffectType.interval
+                    );
+                  } else {
+                    // Use regular lighting effect for all relays
+                    console.log(`💡 Starting regular lighting effect "${sequence.lightingEffectType.name}" on all relays`);
+                    success = await get().startLightingEffect(
+                      sequence.controllerId, 
+                      effect, 
+                      sequence.lightingEffectType.interval
+                    );
+                  }
                   if (success) {
                     console.log(`✅ Successfully started lighting effect ${sequence.lightingEffectType.name}`);
                     

@@ -24,7 +24,7 @@ export const LightingEffectTypeModal: React.FC<LightingEffectTypeModalProps> = (
     description: '',
     tags: [],
     relayCount: 12,
-    interval: 1000
+    interval: 500 // Default to 500ms for better visual effects
   });
 
   const [newTag, setNewTag] = useState('');
@@ -303,44 +303,88 @@ export const LightingEffectTypeModal: React.FC<LightingEffectTypeModalProps> = (
                 </div>
               </div>
 
-              {(formData.effectType === 'strobe' || formData.effectType === 'chase' || formData.effectType === 'fade') && (
+              {(formData.effectType === 'strobe' || formData.effectType === 'chase' || formData.effectType === 'wave' || formData.effectType === 'random') && (
                 <div>
                   <label htmlFor="effect-interval" className="block text-sm font-medium text-gray-300 mb-2">
                     Interval (milliseconds)
                   </label>
-                  <input
-                    id="effect-interval"
-                    type="number"
-                    min="50"
-                    max="10000"
-                    value={formData.interval || 1000}
-                    onChange={(e) => setFormData(prev => ({ ...prev, interval: parseInt(e.target.value) }))}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Time between changes in milliseconds
-                  </p>
+                  <div className="space-y-3">
+                    <input
+                      id="effect-interval"
+                      type="number"
+                      min="50"
+                      max="10000"
+                      value={formData.interval || 1000}
+                      onChange={(e) => setFormData(prev => ({ ...prev, interval: parseInt(e.target.value) }))}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+                    />
+                    
+                    {/* Interval Presets */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, interval: 100 }))}
+                        className="px-2 py-1 text-xs bg-gray-600 hover:bg-lume-primary text-white rounded transition-colors"
+                      >
+                        Fast (100ms)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, interval: 500 }))}
+                        className="px-2 py-1 text-xs bg-gray-600 hover:bg-lume-primary text-white rounded transition-colors"
+                      >
+                        Medium (500ms)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, interval: 1000 }))}
+                        className="px-2 py-1 text-xs bg-gray-600 hover:bg-lume-primary text-white rounded transition-colors"
+                      >
+                        Slow (1s)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          let autoInterval = 1000;
+                          if (formData.effectType === 'strobe') autoInterval = 500;
+                          else if (formData.effectType === 'chase') autoInterval = 300;
+                          else if (formData.effectType === 'wave') autoInterval = 400;
+                          else if (formData.effectType === 'random') autoInterval = 800;
+                          else autoInterval = Math.floor(formData.duration! / 20); // Duration/20 for others
+                          
+                          setFormData(prev => ({ ...prev, interval: autoInterval }));
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                      >
+                        Auto
+                      </button>
+                    </div>
+                    
+                    <p className="text-xs text-gray-400">
+                      Time between changes. Auto sets optimal interval based on effect type.
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {formData.effectType === 'custom' && (
-                <div>
-                  <label htmlFor="relay-pattern" className="block text-sm font-medium text-gray-300 mb-2">
-                    Relay Pattern
-                  </label>
-                  <input
-                    id="relay-pattern"
-                    type="text"
-                    value={patternInput}
-                    onChange={(e) => setPatternInput(e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
-                    placeholder="e.g., 1, 3, 5, 7 or 1, 2, 3, 4"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Comma-separated relay numbers (1-12)
-                  </p>
-                </div>
-              )}
+              {/* Show pattern field for ALL effect types */}
+              <div>
+                <label htmlFor="relay-pattern" className="block text-sm font-medium text-gray-300 mb-2">
+                  Relay Pattern (Optional)
+                </label>
+                <input
+                  id="relay-pattern"
+                  type="text"
+                  value={patternInput}
+                  onChange={(e) => setPatternInput(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+                  placeholder="e.g., 1, 3, 5, 7 or 1, 2, 3, 4"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Comma-separated relay numbers (1-12). Leave empty to use all relays.
+                  {formData.effectType === 'solid' && ' For solid effects, only these relays will stay ON.'}
+                </p>
+              </div>
             </div>
           </div>
 
