@@ -526,7 +526,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         // Lighting effect type management
         addLightingEffectType: (effectType: LightingEffectType) => {
           set((state) => ({
-            lightingEffectTypes: [...state.lightingEffectTypes, effectType]
+            lightingEffectTypes: [...state.lightingEffectTypes.filter(et => et.id !== effectType.id), effectType]
           }));
         },
 

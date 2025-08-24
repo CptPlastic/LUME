@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "LUME",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "identifier": "com.lume.controller",
   "build": {
     "frontendDist": "../dist",
@@ -16,7 +16,7 @@
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": true,
+        "fullscreen": false,
         "minWidth": 800,
         "minHeight": 600
       }
