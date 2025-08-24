@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Play, Pause, Settings, Clock, Lightbulb, Zap, Download, Upload } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 import type { ShowSequence, FireworkType, LightingEffectType, ShowFile } from '../types';
-import { ShowTimeline } from './ShowTimeline';
+import { EnhancedShowTimeline } from './EnhancedShowTimeline';
 
 // Compact card components for better show builder experience
 const CompactFireworkCard: React.FC<{ fireworkType: FireworkType }> = ({ fireworkType }) => {
@@ -905,7 +905,7 @@ export const ShowBuilder: React.FC = () => {
             <p className="text-gray-500">Create a new show to start building your sequence.</p>
           </div>
         ) : (
-          <ShowTimeline
+          <EnhancedShowTimeline
             show={currentShow}
             isPlaying={isPlaying}
             currentTime={currentPlaybackTime}

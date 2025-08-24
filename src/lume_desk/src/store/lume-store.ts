@@ -686,10 +686,13 @@ export const useLumeStore = create<LumeStoreImpl>()(
               }
               
               if (audio.src) {
-                audio.currentTime = 0;
+                // Start from current playback position, not always from 0
+                const { currentPlaybackTime } = get();
+                audio.currentTime = currentPlaybackTime / 1000; // Convert ms to seconds
+                console.log(`🎵 Starting audio from position: ${audio.currentTime}s (${currentPlaybackTime}ms)`);
                 console.log(`🎵 Attempting to play audio...`);
                 audio.play().then(() => {
-                  console.log(`✅ Audio playback started successfully`);
+                  console.log(`✅ Audio playback started successfully from ${audio.currentTime}s`);
                 }).catch((error) => {
                   console.error(`❌ Failed to start audio playback:`, error);
                   alert(`Failed to play audio: ${error.message}`);
@@ -705,11 +708,16 @@ export const useLumeStore = create<LumeStoreImpl>()(
             console.log(`🔇 No audio track for this show`);
           }
 
-          // Start playback time tracking
+          // Start playback time tracking from current position
+          const { currentPlaybackTime } = get();
           const startTime = Date.now();
+          const initialOffset = currentPlaybackTime; // Remember where we started
+          console.log(`⏰ Starting playback timer from ${initialOffset}ms`);
+          
           const playbackTimer = setInterval(() => {
             const elapsed = Date.now() - startTime;
-            set({ currentPlaybackTime: elapsed });
+            const newPlaybackTime = initialOffset + elapsed;
+            set({ currentPlaybackTime: newPlaybackTime });
           }, 100); // Update every 100ms for smooth progress
 
           // Store timer for cleanup
@@ -887,6 +895,14 @@ export const useLumeStore = create<LumeStoreImpl>()(
             return; // No audio to restore
           }
 
+          console.log('🔄 Audio restoration requested:', {
+            audioName: currentShow.audio.name,
+            audioId: currentShow.audio.id,
+            hasFile: !!currentShow.audio.file,
+            hasUrl: !!currentShow.audio.url,
+            fileSize: currentShow.audio.file?.size || 'N/A'
+          });
+
           // If it's a URL-based audio, no restoration needed
           if (currentShow.audio.url) {
             console.log('🔄 Audio is URL-based, no restoration needed');
@@ -897,6 +913,10 @@ export const useLumeStore = create<LumeStoreImpl>()(
           if (!currentShow.audio.file) {
             console.log('🔄 Audio file missing, attempting restoration...');
             try {
+              // First, list all stored files for debugging
+              const storedFiles = await audioStorageService.listStoredFiles();
+              console.log('📦 Available stored audio files:', storedFiles);
+              
               // Try to restore the file from storage
               const restoredFile = await audioStorageService.retrieveAudioFile(currentShow.audio.id);
               if (restoredFile) {
@@ -912,12 +932,28 @@ export const useLumeStore = create<LumeStoreImpl>()(
                 };
 
                 set({ currentShow: updatedShow });
-                console.log(`🔄 Successfully restored audio file: ${updatedAudio.name}`);
+                console.log(`✅ Successfully restored audio file: ${updatedAudio.name}`, {
+                  fileSize: restoredFile.size,
+                  fileType: restoredFile.type,
+                  fileName: restoredFile.name
+                });
               } else {
                 console.warn(`⚠️ Could not restore audio file: ${currentShow.audio.name} (ID: ${currentShow.audio.id})`);
+                
+                // Try performing health check to see if there are backup files
+                const healthCheck = await audioStorageService.performHealthCheck();
+                console.log('🏥 Audio storage health check after failed restoration:', healthCheck);
               }
             } catch (error) {
-              console.error('Failed to restore audio file:', error);
+              console.error('❌ Failed to restore audio file:', error);
+              
+              // Additional debugging information
+              try {
+                const storedFiles = await audioStorageService.listStoredFiles();
+                console.log('📦 Available files after error:', storedFiles);
+              } catch (listError) {
+                console.error('❌ Could not list stored files:', listError);
+              }
             }
           } else {
             console.log('🔄 Audio file already present, no restoration needed');
@@ -952,7 +988,14 @@ export const useLumeStore = create<LumeStoreImpl>()(
         // Only persist certain fields
         partialize: (state) => ({
           controllers: state.controllers,
-          currentShow: state.currentShow,
+          currentShow: state.currentShow ? {
+            ...state.currentShow,
+            // Remove File objects from audio during persistence as they can't be serialized
+            audio: state.currentShow.audio ? {
+              ...state.currentShow.audio,
+              file: undefined // Will be restored from IndexedDB
+            } : undefined
+          } : undefined,
           fireworkTypes: state.fireworkTypes,
           lightingEffectTypes: state.lightingEffectTypes,
         }),
@@ -966,6 +1009,13 @@ export const useLumeStore = create<LumeStoreImpl>()(
             if (typeof state.currentShow.modifiedAt === 'string') {
               state.currentShow.modifiedAt = new Date(state.currentShow.modifiedAt);
             }
+            
+            // Convert uploadedAt in audio metadata if it exists and is a string
+            if (state.currentShow.audio?.uploadedAt && typeof state.currentShow.audio.uploadedAt === 'string') {
+              state.currentShow.audio.uploadedAt = new Date(state.currentShow.audio.uploadedAt);
+            }
+            
+            console.log('🔄 Store rehydrated, audio restoration will be triggered by App component');
           }
         },
       }
