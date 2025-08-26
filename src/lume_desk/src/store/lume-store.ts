@@ -58,6 +58,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         lightingEffectTypes: LightingEffectService.getDefaultLightingEffectTypes(),
         isPlaying: false,
         connectionStatus: 'disconnected',
+        systemArmed: false, // Default to DISARMED for safety
         apis: new Map(),
         lastScanTime: null,
         showTimeouts: [],
@@ -179,7 +180,14 @@ export const useLumeStore = create<LumeStoreImpl>()(
         },
 
         fireChannel: async (controllerId: string, area: number, channel: number): Promise<boolean> => {
-          const { apis } = get();
+          const { apis, systemArmed } = get();
+          
+          // Check if system is armed before firing
+          if (!systemArmed) {
+            console.warn('🚫 DISARMED: Cannot fire fireworks when system is DISARMED');
+            return false;
+          }
+          
           const api = apis.get(controllerId);
           
           if (!api) return false;
@@ -190,6 +198,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
             await api.syncArea(area);
             
             // Then fire the channel
+            console.log(`🎆 ARMED: Firing area ${area} channel ${channel}`);
             const result = await api.fireChannel(channel);
             return result.success;
           } catch (error) {
@@ -239,12 +248,20 @@ export const useLumeStore = create<LumeStoreImpl>()(
         },
 
         testAllChannels: async (controllerId: string): Promise<boolean> => {
-          const { apis } = get();
+          const { apis, systemArmed } = get();
+          
+          // Check if system is armed before testing
+          if (!systemArmed) {
+            console.warn('🚫 DISARMED: Cannot test firework channels when system is DISARMED');
+            return false;
+          }
+          
           const api = apis.get(controllerId);
           
           if (!api) return false;
           
           try {
+            console.log(`📝 ARMED: Testing all channels on controller ${controllerId}`);
             const result = await api.testAllChannels();
             return result.success;
           } catch (error) {
@@ -544,6 +561,15 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }));
         },
 
+        // System armed/disarmed state management
+        toggleSystemArmed: () => {
+          set((state) => ({ systemArmed: !state.systemArmed }));
+        },
+
+        setSystemArmed: (armed: boolean) => {
+          set(() => ({ systemArmed: armed }));
+        },
+
         // Enhanced Import/Export with audio support
         exportShow: async (showId: string): Promise<ShowFile> => {
           const { currentShow, fireworkTypes, lightingEffectTypes, controllers } = get();
@@ -723,14 +749,20 @@ export const useLumeStore = create<LumeStoreImpl>()(
           // Store timer for cleanup
           get().showTimeouts.push(playbackTimer as any);
 
-          // Sort sequences by timestamp
-          const sortedSequences = [...currentShow.sequences].sort((a, b) => a.timestamp - b.timestamp);
+          // Sort sequences by timestamp and filter out sequences that should have already fired
+          const { currentPlaybackTime: playbackPosition } = get();
+          const sortedSequences = [...currentShow.sequences]
+            .filter(sequence => sequence.timestamp >= playbackPosition) // Only future sequences
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+          console.log(`🎯 Filtering sequences: ${currentShow.sequences.length} total, ${sortedSequences.length} remaining from ${playbackPosition}ms`);
 
           sortedSequences.forEach((sequence) => {
-            const delay = sequence.timestamp; // Already in milliseconds
+            const delay = sequence.timestamp - playbackPosition; // Relative delay from current position
+            console.log(`⏱️ Scheduling ${sequence.fireworkType?.name || sequence.lightingEffectType?.name} in ${delay}ms (at ${sequence.timestamp}ms)`);
             
             const timeout = setTimeout(async () => {
-              console.log(`🎆 Firing sequence: ${sequence.fireworkType?.name || sequence.lightingEffectType?.name} on ${sequence.controllerId} Area ${sequence.area}`);
+              console.log(`🎆 Firing sequence at ${sequence.timestamp}ms: ${sequence.fireworkType?.name || sequence.lightingEffectType?.name} on ${sequence.controllerId} Area ${sequence.area}`);
               
               try {
                 if (sequence.type === 'firework' && sequence.channel) {
@@ -998,6 +1030,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           } : undefined,
           fireworkTypes: state.fireworkTypes,
           lightingEffectTypes: state.lightingEffectTypes,
+          systemArmed: state.systemArmed, // Persist armed/disarmed state
         }),
         // Convert string dates back to Date objects after rehydration
         onRehydrateStorage: () => (state) => {

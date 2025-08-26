@@ -239,6 +239,7 @@ export interface LumeStore {
   lightingEffectTypes: LightingEffectType[]; // New lighting effect types
   isPlaying: boolean;
   connectionStatus: 'scanning' | 'connected' | 'disconnected';
+  systemArmed: boolean; // New: System armed/disarmed state
   
   // Actions
   addController: (controller: ESP32Controller) => void;
@@ -273,6 +274,10 @@ export interface LumeStore {
   addLightingEffectType: (effectType: LightingEffectType) => void;
   updateLightingEffectType: (id: string, updates: Partial<LightingEffectType>) => void;
   removeLightingEffectType: (id: string) => void;
+  
+  // System armed/disarmed state management
+  toggleSystemArmed: () => void;
+  setSystemArmed: (armed: boolean) => void;
   
   // Enhanced Import/Export with async support
   exportShow: (showId: string) => Promise<ShowFile>;

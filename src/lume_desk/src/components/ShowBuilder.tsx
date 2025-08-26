@@ -206,16 +206,22 @@ export const ShowBuilder: React.FC = () => {
 
   // Import/Export handlers
   const handleExportShow = async () => {
+    console.log('🔽 Export button clicked!');
+    console.log('🔍 Current show:', currentShow);
+    
     if (!currentShow) {
+      console.log('❌ No current show');
       alert('No show to export');
       return;
     }
     
     try {
+      console.log('📤 Calling downloadShow with ID:', currentShow.id);
       await downloadShow(currentShow.id);
+      console.log('✅ downloadShow completed successfully');
     } catch (error) {
-      console.error('Export failed:', error);
-      alert('Failed to export show. Please try again.');
+      console.error('❌ Export failed:', error);
+      alert(`Failed to export show. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

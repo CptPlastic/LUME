@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Settings, Search, Lightbulb, Upload, Download } from 'lucide-react';
+import { Plus, Settings, Search, Lightbulb, Upload, Download, MoreVertical, Trash2 } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 import { ESP32API } from '../services/esp32-api';
 import { LightingEffectTypeCard } from './LightingEffectTypeCard';
@@ -20,8 +20,13 @@ export const LightingEffectManager: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [selectedController, setSelectedController] = useState('');
   const [selectedRelays, setSelectedRelays] = useState<number[]>([]);
+  const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [operationFeedback, setOperationFeedback] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
+  const [testingEffect, setTestingEffect] = useState<string | null>(null);
 
-  const handleTestLightingEffect = async (lightingEffect: LightingEffectType) => {
+  const handleTestLightingEffect = async (lightingEffect: LightingEffectType, isPreview = false) => {
+    setTestingEffect(lightingEffect.id);
     console.log('🧪 Testing lighting effect:', lightingEffect.name);
     console.log('🔍 Full effect object:', lightingEffect);
     
@@ -105,7 +110,7 @@ export const LightingEffectManager: React.FC = () => {
           } catch (error) {
             console.error('❌ Failed to stop custom effect test:', error);
           }
-        }, lightingEffect.duration);
+        }, isPreview ? 2000 : lightingEffect.duration);
       } else {
         // No pattern: use normal effect logic (all relays)
         console.log('🎛️ Testing all relays with effect:', effectType);
@@ -117,13 +122,38 @@ export const LightingEffectManager: React.FC = () => {
           } catch (error) {
             console.error('❌ Failed to stop full effect test:', error);
           }
-        }, lightingEffect.duration);
+        }, isPreview ? 2000 : lightingEffect.duration);
       }
 
       console.log('✅ Test lighting effect started');
+      
+      // Add formatDuration helper
+      const formatDuration = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        if (minutes > 0) {
+          return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+        return `${seconds}s`;
+      };
+      
+      setOperationFeedback({
+        type: 'success',
+        message: isPreview 
+          ? `🔍 Quick preview of "${lightingEffect.name}" (2s)!`
+          : `🎡 Testing "${lightingEffect.name}" for ${formatDuration(lightingEffect.duration)}!`
+      });
+      setTimeout(() => setOperationFeedback(null), 3000);
     } catch (error) {
       console.error('❌ Failed to test lighting effect:', error);
-      alert('Failed to test lighting effect. Check controller connection.');
+      setOperationFeedback({
+        type: 'error',
+        message: `❌ Failed to test "${lightingEffect.name}". Check controller connection.`
+      });
+      setTimeout(() => setOperationFeedback(null), 5000);
+    } finally {
+      setTestingEffect(null);
     }
   };
 
@@ -157,6 +187,53 @@ export const LightingEffectManager: React.FC = () => {
     setShowModal(true);
   };
 
+  const handleDuplicate = (effectType: LightingEffectType) => {
+    const duplicated = {
+      ...effectType,
+      id: `${effectType.id}_copy_${Date.now()}`,
+      name: `${effectType.name} (Copy)`
+    };
+    addLightingEffectType(duplicated);
+    setOperationFeedback({
+      type: 'success',
+      message: `✅ Duplicated "${effectType.name}" successfully!`
+    });
+    setTimeout(() => setOperationFeedback(null), 3000);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedEffects.length === 0) return;
+    if (confirm(`Delete ${selectedEffects.length} lighting effects? This action cannot be undone.`)) {
+      const count = selectedEffects.length;
+      selectedEffects.forEach(id => removeLightingEffectType(id));
+      setSelectedEffects([]);
+      setBulkMode(false);
+      setOperationFeedback({
+        type: 'success',
+        message: `🗑️ Deleted ${count} effects successfully!`
+      });
+      setTimeout(() => setOperationFeedback(null), 3000);
+    }
+  };
+
+  const toggleSelectEffect = (id: string) => {
+    setSelectedEffects(prev => 
+      prev.includes(id) 
+        ? prev.filter(effectId => effectId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const selectAllFiltered = () => {
+    const allFilteredIds = filteredEffectTypes.map(et => et.id);
+    setSelectedEffects(allFilteredIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedEffects([]);
+    setBulkMode(false);
+  };
+
   const handleSave = (effectType: LightingEffectType) => {
     if (editingEffect) {
       updateLightingEffectType(editingEffect.id, effectType);
@@ -173,8 +250,18 @@ export const LightingEffectManager: React.FC = () => {
 
   const confirmDeleteEffect = () => {
     if (confirmDelete) {
+      const effectToDelete = lightingEffectTypes.find(et => et.id === confirmDelete);
       removeLightingEffectType(confirmDelete);
       setConfirmDelete(null);
+      // Force re-render by clearing any related state
+      if (editingEffect?.id === confirmDelete) {
+        setEditingEffect(null);
+      }
+      setOperationFeedback({
+        type: 'success',
+        message: `🗑️ Deleted "${effectToDelete?.name || 'effect'}" successfully!`
+      });
+      setTimeout(() => setOperationFeedback(null), 3000);
     }
   };
 
@@ -401,6 +488,19 @@ export const LightingEffectManager: React.FC = () => {
             <span>Export</span>
           </button>
 
+          {/* Bulk Mode Toggle */}
+          <button
+            onClick={() => setBulkMode(!bulkMode)}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              bulkMode 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            }`}
+          >
+            <MoreVertical className="w-4 h-4" />
+            <span>{bulkMode ? 'Exit Bulk' : 'Bulk Mode'}</span>
+          </button>
+
           {/* New Effect */}
           <button
             onClick={handleCreateNew}
@@ -572,6 +672,43 @@ export const LightingEffectManager: React.FC = () => {
         )}
       </div>
 
+      {/* Bulk Operations Bar */}
+      {bulkMode && (
+        <div className="bg-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-white font-medium">
+                {selectedEffects.length} of {filteredEffectTypes.length} selected
+              </span>
+              <button
+                onClick={selectAllFiltered}
+                className="text-blue-300 hover:text-blue-100 text-sm underline"
+              >
+                Select All Visible
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-blue-300 hover:text-blue-100 text-sm underline"
+              >
+                Clear Selection
+              </button>
+            </div>
+            
+            {selectedEffects.length > 0 && (
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Selected ({selectedEffects.length})</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gray-800 rounded-lg p-4">
@@ -667,6 +804,12 @@ export const LightingEffectManager: React.FC = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onTest={handleTestLightingEffect}
+                onPreview={(effect: LightingEffectType) => handleTestLightingEffect(effect, true)}
+                onDuplicate={handleDuplicate}
+                onSelect={bulkMode ? () => toggleSelectEffect(effectType.id) : undefined}
+                isSelected={selectedEffects.includes(effectType.id)}
+                showSelection={bulkMode}
+                isLoading={testingEffect === effectType.id}
               />
             ))}
           </div>
@@ -707,6 +850,27 @@ export const LightingEffectManager: React.FC = () => {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Operation Feedback Toast */}
+      {operationFeedback && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg border transition-all duration-300 ${
+          operationFeedback.type === 'success' 
+            ? 'bg-green-800 border-green-600 text-green-100'
+            : operationFeedback.type === 'error'
+            ? 'bg-red-800 border-red-600 text-red-100'
+            : 'bg-blue-800 border-blue-600 text-blue-100'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <div className="font-medium">{operationFeedback.message}</div>
+            <button
+              onClick={() => setOperationFeedback(null)}
+              className="text-current hover:opacity-70 ml-2"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

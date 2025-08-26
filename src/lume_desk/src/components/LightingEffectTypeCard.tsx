@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Clock, Edit, Trash2, Lightbulb, Flashlight, Play } from 'lucide-react';
+import { Zap, Clock, Edit, Trash2, Lightbulb, Flashlight, Play, Copy, Loader2, Eye } from 'lucide-react';
 import type { LightingEffectType } from '../types';
 
 interface LightingEffectTypeCardProps {
@@ -7,9 +7,13 @@ interface LightingEffectTypeCardProps {
   onEdit: (effectType: LightingEffectType) => void;
   onDelete: (id: string) => void;
   onTest?: (effectType: LightingEffectType) => void;
+  onPreview?: (effectType: LightingEffectType) => void;
+  onDuplicate?: (effectType: LightingEffectType) => void;
   onSelect?: (effectType: LightingEffectType) => void;
   isSelected?: boolean;
   showActions?: boolean;
+  showSelection?: boolean;
+  isLoading?: boolean;
 }
 
 export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
@@ -17,9 +21,13 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
   onEdit,
   onDelete,
   onTest,
+  onPreview,
+  onDuplicate,
   onSelect,
   isSelected = false,
-  showActions = true
+  showActions = true,
+  showSelection = false,
+  isLoading = false
 }) => {
   const formatDuration = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -74,24 +82,44 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
     }
   };
 
+  const handleSelectionClick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (onSelect) {
+      onSelect(lightingEffectType);
+    }
+  };
+
   return (
     <div 
       className={`p-4 rounded-lg border transition-all duration-200 ${
-        isSelected 
+        isSelected && showSelection
+          ? 'border-blue-500 bg-blue-900/20' 
+          : isSelected 
           ? 'border-lume-primary bg-gray-700/50' 
           : 'border-gray-600 bg-gray-750 hover:border-gray-500'
-      } ${onSelect ? 'cursor-pointer' : ''}`}
-      onClick={handleCardClick}
+      } ${onSelect && !showSelection ? 'cursor-pointer' : ''}`}
+      onClick={!showSelection ? handleCardClick : undefined}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-1">
-            <h3 className="font-semibold text-white text-lg">{lightingEffectType.name}</h3>
-            <div className={`p-1 rounded ${getCategoryColor(lightingEffectType.category)}`}>
-              {getCategoryIcon(lightingEffectType.category)}
+        <div className="flex items-center space-x-3 flex-1">
+          {showSelection && (
+            <div className="flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={handleSelectionClick}
+                className="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+              />
             </div>
-          </div>
+          )}
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-1">
+              <h3 className="font-semibold text-white text-lg">{lightingEffectType.name}</h3>
+              <div className={`p-1 rounded ${getCategoryColor(lightingEffectType.category)}`}>
+                {getCategoryIcon(lightingEffectType.category)}
+              </div>
+            </div>
           
           <div className="flex items-center space-x-3 text-sm">
             <span className={`capitalize font-medium ${getCategoryColor(lightingEffectType.category).split(' ')[0]}`}>
@@ -104,20 +132,59 @@ export const LightingEffectTypeCard: React.FC<LightingEffectTypeCardProps> = ({
             <span className="text-gray-400">•</span>
             <span className="text-gray-300 capitalize">{lightingEffectType.effectType}</span>
           </div>
+          </div>
         </div>
         
-        {showActions && (
+        {showActions && !showSelection && (
           <div className="flex space-x-1 ml-2">
+            {onPreview && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPreview(lightingEffectType);
+                }}
+                className={`p-1.5 transition-colors ${
+                  isLoading 
+                    ? 'text-blue-400 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-blue-400'
+                }`}
+                title={isLoading ? "Testing in progress..." : "Quick preview (2s)"}
+                disabled={isLoading}
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+            )}
             {onTest && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onTest(lightingEffectType);
                 }}
-                className="p-1.5 text-gray-400 hover:text-green-400 transition-colors"
-                title="Test lighting effect"
+                className={`p-1.5 transition-colors ${
+                  isLoading 
+                    ? 'text-green-400 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-green-400'
+                }`}
+                title={isLoading ? "Testing in progress..." : "Test full effect"}
+                disabled={isLoading}
               >
-                <Play className="w-4 h-4" />
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {onDuplicate && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicate(lightingEffectType);
+                }}
+                className="p-1.5 text-gray-400 hover:text-yellow-400 transition-colors"
+                title="Duplicate lighting effect"
+              >
+                <Copy className="w-4 h-4" />
               </button>
             )}
             <button

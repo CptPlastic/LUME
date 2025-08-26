@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Wifi, WifiOff, AlertTriangle, Power, Wrench, Sparkles, Lightbulb, Clapperboard } from 'lucide-react';
+import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 
 interface HeaderProps {
@@ -13,7 +13,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
     activeController, 
     connectionStatus, 
     isPlaying,
-    emergencyStopAll,
+    systemArmed,
+    toggleSystemArmed,
     scanForControllers 
   } = useLumeStore();
 
@@ -33,14 +34,16 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
     }
   };
 
-  const handleEmergencyStop = async () => {
-    if (window.confirm('EMERGENCY STOP: This will immediately stop all controllers. Continue?')) {
-      await emergencyStopAll();
-    }
+  const handleToggleArmed = () => {
+    console.log('Toggle button clicked. Current state:', systemArmed);
+    toggleSystemArmed();
+    console.log('toggleSystemArmed called');
   };
 
+  // Emergency stop functionality removed as per user request
+
   return (
-    <header className="bg-lume-dark border-b border-gray-700 px-6 py-4">
+    <header className="bg-lume-dark border-b border-gray-700 px-6 py-4 relative">
       <div className="flex items-center justify-between">
         {/* Logo and Title */}
         <div className="flex items-center space-x-3">
@@ -138,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
 
           {/* Show Status */}
           {isPlaying && (
-            <div className="flex items-center space-x-2 px-3 py-1 bg-green-600 rounded-lg">
+            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-600 rounded-lg">
               <Power className="w-4 h-4 text-white" />
               <span className="text-sm text-white font-medium">Show Playing</span>
             </div>
@@ -155,13 +158,56 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
             {connectionStatus === 'scanning' ? 'Scanning...' : 'Scan'}
           </button>
 
-          <button
-            onClick={handleEmergencyStop}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors flex items-center space-x-2"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>EMERGENCY STOP</span>
-          </button>
+          {/* ARMED/DISARMED System Toggle */}
+          <div className="relative">
+            <button
+              onClick={handleToggleArmed}
+              className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 active:scale-95 ${
+                systemArmed 
+                  ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-xl shadow-red-500/30 ring-2 ring-red-400/20' 
+                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-xl shadow-green-500/30 ring-2 ring-green-400/20'
+              }`}
+              title={systemArmed ? 'Click to DISARM system (disable firework firing)' : 'Click to ARM system (enable firework firing)'}
+            >
+              <div className={`w-3 h-3 rounded-full animate-pulse ${
+                systemArmed ? 'bg-red-200' : 'bg-green-200'
+              }`} />
+              {systemArmed ? (
+                <>
+                  <ShieldAlert className="w-6 h-6" />
+                  <span className="tracking-wide">ARMED</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-6 h-6" />
+                  <span className="tracking-wide">DISARMED</span>
+                </>
+              )}
+            </button>
+            
+            {/* Status indicator */}
+            <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full animate-pulse ${
+              systemArmed ? 'bg-red-400' : 'bg-green-400'
+            }`} />
+          </div>
+        </div>
+      </div>
+      
+      {/* Sleek Status Bar */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 transition-all duration-300 ${
+        systemArmed 
+          ? 'bg-gradient-to-r from-red-600 via-red-500 to-red-600 shadow-lg shadow-red-500/50' 
+          : 'bg-gradient-to-r from-green-600 via-green-500 to-green-600 shadow-lg shadow-green-500/50'
+      }`}>
+        <div className={`h-full w-full relative overflow-hidden ${
+          systemArmed ? 'bg-red-400/20' : 'bg-green-400/20'
+        }`}>
+          {/* Animated flowing effect */}
+          <div className={`absolute inset-0 animate-pulse opacity-60 ${
+            systemArmed 
+              ? 'bg-gradient-to-r from-transparent via-red-300/30 to-transparent'
+              : 'bg-gradient-to-r from-transparent via-green-300/30 to-transparent'
+          } transform -skew-x-12`} />
         </div>
       </div>
     </header>
