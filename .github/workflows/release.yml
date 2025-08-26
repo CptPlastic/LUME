@@ -111,7 +111,21 @@ jobs:
           cat package.json | grep version
         shell: bash
 
-      - name: Build the app
+      - name: Check for code signing secrets (macOS)
+        if: matrix.platform == 'macos-latest'
+        id: check_secrets
+        run: |
+          if [[ -n "${{ secrets.APPLE_CERTIFICATE }}" ]]; then
+            echo "has_signing=true" >> $GITHUB_OUTPUT
+            echo "✅ Code signing certificates found"
+          else
+            echo "has_signing=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No code signing certificates - building unsigned"
+            echo "💡 Add APPLE_* secrets to enable code signing"
+          fi
+
+      - name: Build the app (with code signing)
+        if: matrix.platform != 'macos-latest' || steps.check_secrets.outputs.has_signing == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -150,6 +164,63 @@ jobs:
           releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Build the app (unsigned macOS)
+        if: matrix.platform == 'macos-latest' && steps.check_secrets.outputs.has_signing == 'false'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./src/lume_desk
+          tagName: ${{ needs.get-version.outputs.tag-name }}
+          releaseName: 'LUME Controller v${{ needs.get-version.outputs.version }} (Unsigned)'
+          releaseBody: |
+            ## 🎆 LUME Desktop Controller v${{ needs.get-version.outputs.version }}
+            
+            Professional firework and lighting control application.
+            
+            ⚠️ **macOS Security Note**: This build is unsigned. When you first run it:
+            1. Right-click the app and select "Open"
+            2. Click "Open" in the security dialog
+            3. Or go to System Preferences > Security & Privacy and allow it
+            
+            ### What's New
+            - Enhanced ARM/DISARM system for improved safety
+            - Fixed export functionality
+            - Improved play-from-cursor timing
+            - Better visual feedback and user experience
+            
+            ### Download Instructions
+            - **Windows**: Download `.exe` or `.msi` file
+            - **macOS**: Download `.dmg` file (unsigned - see security note above)
+            - **Linux**: Download `.AppImage` or `.deb` file
+            
+            ### System Requirements
+            - **Windows**: Windows 10 or later
+            - **macOS**: macOS 10.15 (Catalina) or later
+            - **Linux**: Ubuntu 20.04+ or equivalent
+            
+            Built with ❤️ for the pyrotechnics community.
+          releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      - name: Code signing status
+        if: matrix.platform == 'macos-latest'
+        run: |
+          if [[ "${{ steps.check_secrets.outputs.has_signing }}" == "true" ]]; then
+            echo "✅ Built with code signing - users can run directly"
+          else
+            echo "⚠️ Built without code signing - users will see security warnings"
+            echo ""
+            echo "To enable code signing, add these repository secrets:"
+            echo "  • APPLE_CERTIFICATE (Base64 encoded .p12 certificate)"
+            echo "  • APPLE_CERTIFICATE_PASSWORD"
+            echo "  • APPLE_SIGNING_IDENTITY"
+            echo "  • APPLE_ID"
+            echo "  • APPLE_PASSWORD (App-specific password)"
+            echo "  • APPLE_TEAM_ID"
+          fi
 
   create-release:
     needs: [get-version, build]
