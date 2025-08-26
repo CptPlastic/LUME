@@ -1,0 +1,98 @@
+name: 'Build and Test'
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Allow manual runs
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './src/lume_desk/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./src/lume_desk
+
+      - name: Run linter
+        run: npm run lint
+        working-directory: ./src/lume_desk
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./src/lume_desk
+
+  test-tauri:
+    needs: test-frontend
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src/lume_desk/src-tauri -> target'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './src/lume_desk/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: ./src/lume_desk
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./src/lume_desk
+
+      - name: Build Tauri app (Debug)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./src/lume_desk
+          args: --debug
+
+      - name: Upload build artifacts
+        if: matrix.platform == 'ubuntu-22.04'  # Only upload from one platform to save space
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-build-${{ matrix.platform }}
+          path: |
+            src/lume_desk/src-tauri/target/debug/bundle/
+          retention-days: 7
