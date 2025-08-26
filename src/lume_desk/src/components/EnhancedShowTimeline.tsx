@@ -525,7 +525,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
   // Generate audio waveform data
   const generateWaveform = useCallback(async (audioFile: File | string) => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new AudioContextClass();
       let audioBuffer: AudioBuffer;
 
       if (typeof audioFile === 'string') {
@@ -566,7 +567,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
       console.error('Failed to generate waveform:', error);
       setAudioWaveform([]);
     }
-  }, []);
+  }, [timelineWidth]);
 
   // Generate waveform when audio changes
   useEffect(() => {

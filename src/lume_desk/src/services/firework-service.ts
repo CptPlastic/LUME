@@ -1,4 +1,4 @@
-import type { FireworkType, ShowFile, Show } from '../types';
+import type { FireworkType, ShowFile, Show, ESP32Controller } from '../types';
 
 export class FireworkService {
   
@@ -118,7 +118,7 @@ export class FireworkService {
   }
 
   // Export show to JSON file
-  static exportShow(show: Show, fireworkTypes: FireworkType[], controllers: any[]): ShowFile {
+  static exportShow(show: Show, fireworkTypes: FireworkType[], controllers: ESP32Controller[]): ShowFile {
     const usedFireworkTypeIds = new Set(
       show.sequences
         .filter(seq => seq.fireworkTypeId) // Filter out sequences without fireworkTypeId

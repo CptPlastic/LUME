@@ -34,11 +34,14 @@ export const LightingControls: React.FC<LightingControlsProps> = ({ controllerId
     const fetchStatus = async () => {
       try {
         const status = await getLightingStatus(controllerId);
-        if (status.relayStates) {
-          setRelayStates(status.relayStates);
-        }
-        if (status.effectName) {
-          setCurrentEffect(status.effectRunning ? status.effectName : null);
+        if (status && typeof status === 'object') {
+          if ('relayStates' in status && Array.isArray(status.relayStates)) {
+            setRelayStates(status.relayStates as boolean[]);
+          }
+          if ('effectName' in status && typeof status.effectName === 'string') {
+            const isRunning = 'effectRunning' in status && status.effectRunning;
+            setCurrentEffect(isRunning ? status.effectName : null);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch lighting status:', error);

@@ -77,7 +77,7 @@ export const FireworkTypeModal: React.FC<FireworkTypeModalProps> = ({
     'palm', 'ring', 'mine', 'fountain', 'rapid-fire', 'delayed', 'multi-break'
   ];
 
-  const handleInputChange = (field: keyof FireworkType, value: any) => {
+  const handleInputChange = (field: keyof FireworkType, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

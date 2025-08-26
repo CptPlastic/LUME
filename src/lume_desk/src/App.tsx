@@ -63,7 +63,7 @@ function App() {
     };
 
     initializeApp();
-  }, [restoreShowAudio, currentShow?.audio?.id]);
+  }, [restoreShowAudio, currentShow]);
 
   // Show loading state during initialization
   if (!isInitialized) {

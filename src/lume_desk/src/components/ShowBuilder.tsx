@@ -263,7 +263,7 @@ export const ShowBuilder: React.FC = () => {
         restoreShowAudio();
       }
     }
-  }, [currentShow?.id, currentShow?.audio?.id, restoreShowAudio]);
+  }, [currentShow?.id, currentShow?.audio, restoreShowAudio]);
 
   const [showName, setShowName] = useState('New Show');
   const [showDescription, setShowDescription] = useState('');

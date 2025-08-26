@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile, LightingEffectType, AudioTrack } from '../types';
+import type { ESP32Controller, Show, ShowSequence, LumeStore, FireworkType, ShowFile, LightingEffectType, AudioTrack, SystemStatus } from '../types';
 import { ESP32API, controllerDiscovery } from '../services/esp32-api';
 import { FireworkService } from '../services/firework-service';
 import { LightingEffectService } from '../services/lighting-effect-service';
@@ -32,7 +32,7 @@ interface LumeStoreImpl extends LumeStore {
   startLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', interval?: number) => Promise<boolean>;
   startSelectiveLightingEffect: (controllerId: string, effect: 'SOLID' | 'STROBE' | 'CHASE' | 'WAVE' | 'RANDOM', relays: number[], interval?: number) => Promise<boolean>;
   stopLightingEffect: (controllerId: string) => Promise<boolean>;
-  getLightingStatus: (controllerId: string) => Promise<any>;
+  getLightingStatus: (controllerId: string) => Promise<SystemStatus | Record<string, unknown>>;
   
   // Show management
   createShow: (name: string, description: string) => void;
@@ -400,7 +400,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }
         },
 
-        getLightingStatus: async (controllerId: string): Promise<any> => {
+        getLightingStatus: async (controllerId: string): Promise<SystemStatus | Record<string, unknown>> => {
           const { apis } = get();
           const api = apis.get(controllerId);
           
@@ -747,7 +747,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
           }, 100); // Update every 100ms for smooth progress
 
           // Store timer for cleanup
-          get().showTimeouts.push(playbackTimer as any);
+          get().showTimeouts.push(playbackTimer as NodeJS.Timeout);
 
           // Sort sequences by timestamp and filter out sequences that should have already fired
           const { currentPlaybackTime: playbackPosition } = get();
