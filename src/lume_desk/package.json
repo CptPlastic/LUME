@@ -1,7 +1,7 @@
 {
   "name": "lume-desktop-controller",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "description": "LUME Desktop Controller - Professional firework and lighting control application",
   "author": "LUME Team",
