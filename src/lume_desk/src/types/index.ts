@@ -146,6 +146,7 @@ export interface AudioTrack {
   size?: number; // File size in bytes
   uploadedAt: Date;
   waveformData?: number[]; // Pre-computed waveform for visualization
+  startOffset?: number; // When the audio starts playing in the timeline (milliseconds from show start)
 }
 
 export interface LightingShowSequence {

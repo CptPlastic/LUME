@@ -18,10 +18,26 @@ LUME automatically detects three network modes:
 3. **Offline** - No network connectivity
 
 ### Auto-Update System
-- Uses Tauri's built-in updater when available
+- Uses custom VersionService for update checking (Tauri built-in updater removed for simplicity)
 - Fallback to manual download for browser/development environments
 - Critical updates are highlighted and cannot be dismissed
 - Non-critical updates can be deferred
+- 24-hour caching to avoid excessive API calls
+
+### Update Configuration
+The app uses a **custom Version Service** instead of Tauri's built-in updater to avoid configuration complexity:
+
+**Removed from `lib.rs`:**
+```rust
+// .plugin(tauri_plugin_updater::Builder::new().build()) // REMOVED
+```
+
+**Removed from `tauri.conf.json`:**
+```json
+// "plugins": { "updater": { ... } } // REMOVED
+```
+
+This simplified approach provides better control over update checking and avoids plugin initialization conflicts.
 
 ## 🌐 Offline Mode
 
@@ -132,15 +148,22 @@ The update server should provide a REST API at `/latest` returning:
 - `UpdateNotification` - React component for UI
 
 ### Dependencies Added
-- `@tauri-apps/api/updater` - Tauri update functionality
-- `@tauri-apps/api/shell` - Shell operations for downloads
+
 - `axios` timeout configurations for network detection
+- `@tauri-apps/plugin-shell` - Shell operations for downloads (retained)
+- `@tauri-apps/plugin-dialog` - File dialogs
+- `@tauri-apps/plugin-fs` - File system access
+
+**Removed Dependencies:**
+- `@tauri-apps/plugin-updater` - Removed to simplify configuration
 
 ### File Changes
+
 - `ShowBuilder.tsx` - Added offline mode support
-- `App.tsx` - Integrated update notifications
-- `Cargo.toml` - Added updater and shell plugins
-- `tauri.conf.json` - Added required permissions
+- `App.tsx` - Integrated update notifications  
+- `lib.rs` - Removed updater plugin initialization
+- `tauri.conf.json` - Removed updater plugin configuration, simplified setup
+- `version-service.ts` - Custom update checking implementation
 
 ## 📋 Testing
 
@@ -156,3 +179,24 @@ The update server should provide a REST API at `/latest` returning:
 - Test on different platforms (macOS, Windows, Linux)
 
 This implementation provides a robust foundation for LUME's operation in various network conditions while maintaining the professional show programming workflow.
+
+## 🎵 New Timeline Features
+
+### Draggable Audio Positioning
+- Audio tracks can now be moved along the timeline by dragging
+- Visual feedback shows audio position and start offset
+- Audio start position is saved in show files
+- Supports both uploaded files and linked audio URLs
+
+### Enhanced Timeline Interaction
+- **Sequences**: Drag firework and lighting sequences to reposition them
+- **Audio**: Drag audio track to change when it starts playing
+- **Lighting Duration**: Resize lighting effects by dragging the right edge
+- **Timeline Seeking**: Click anywhere on timeline to jump to that time
+- **Zoom Controls**: Zoom in/out for precise editing
+
+### Show Builder Improvements
+- Real-time visual feedback during dragging
+- Collision detection prevents overlapping sequences
+- Persistent audio positioning across save/load cycles
+- Improved timeline ruler with better time markers

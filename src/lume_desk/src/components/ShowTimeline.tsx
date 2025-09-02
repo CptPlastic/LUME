@@ -11,6 +11,7 @@ interface ShowTimelineProps {
   onSequenceUpdate: (sequenceId: string, updates: Partial<ShowSequence>) => void;
   onAudioUpload: (audioTrack: AudioTrack) => Promise<void>;
   onAudioRemove: () => void;
+  onAudioMove: (newStartOffset: number) => void; // New prop for moving audio
   onPlay: () => void;
   onPause: () => void;
   onSeek: (timestamp: number) => void;
@@ -25,11 +26,13 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
   onSequenceUpdate,
   onAudioUpload,
   onAudioRemove,
+  onAudioMove,
   onPlay,
   onPause,
   onSeek
 }) => {
   const [isDragging, setIsDragging] = useState<string | null>(null);
+  const [isDraggingAudio, setIsDraggingAudio] = useState(false);
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [showAudioModal, setShowAudioModal] = useState(false);
@@ -113,6 +116,19 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
     }
   };
 
+  // Handle audio dragging
+  const handleAudioMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent timeline click
+    setIsDraggingAudio(true);
+    
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (rect && show.audio) {
+      const audioStartPixel = timestampToPixel(show.audio.startOffset || 0);
+      setDragOffset(e.clientX - rect.left - audioStartPixel);
+    }
+  };
+
   // Handle resize start for lighting effects
   const handleResizeStart = (e: React.MouseEvent, sequenceId: string) => {
     e.stopPropagation();
@@ -132,11 +148,18 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
     const rect = timelineRef.current.getBoundingClientRect();
     const elementWidth = rect.width;
 
-    // Handle dragging
+    // Handle dragging sequences
     if (isDragging) {
       const newPixel = Math.max(0, Math.min(elementWidth, e.clientX - rect.left - dragOffset));
       const newTimestamp = Math.max(0, pixelToTimestamp(newPixel));
       onSequenceMove(isDragging, newTimestamp);
+    }
+
+    // Handle dragging audio
+    if (isDraggingAudio) {
+      const newPixel = Math.max(0, Math.min(elementWidth, e.clientX - rect.left - dragOffset));
+      const newStartOffset = Math.max(0, pixelToTimestamp(newPixel));
+      onAudioMove(newStartOffset);
     }
 
     // Handle resizing
@@ -155,6 +178,7 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
 
   const handleMouseUp = () => {
     setIsDragging(null);
+    setIsDraggingAudio(false);
     setIsResizing(null);
     setDragOffset(0);
   };
@@ -203,7 +227,7 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
 
   // Handle timeline seeking
   const handleTimelineClick = (e: React.MouseEvent) => {
-    if (isDragging) return;
+    if (isDragging || isDraggingAudio) return;
     
     const rect = timelineRef.current?.getBoundingClientRect();
     if (rect) {
@@ -463,9 +487,30 @@ export const ShowTimeline: React.FC<ShowTimelineProps> = ({
         >
           {/* Audio Waveform */}
           {show.audio && (
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-900/30 to-blue-800/30 rounded-lg">
-              <div className="text-xs text-blue-300 p-2">
+            <div 
+              className={`absolute bg-gradient-to-r from-blue-900/30 to-blue-800/30 rounded-lg cursor-move border-2 border-blue-500/30 hover:border-blue-400/50 transition-all group ${
+                isDraggingAudio ? 'opacity-75 scale-105' : ''
+              }`}
+              style={{
+                left: timestampToPixel(show.audio.startOffset || 0),
+                width: timestampToPixel(show.audio.duration),
+                top: 0,
+                height: '100%'
+              }}
+              onMouseDown={handleAudioMouseDown}
+              title={`🎵 ${show.audio.name} - Drag to reposition`}
+            >
+              <div className="text-xs text-blue-300 p-2 pointer-events-none">
                 🎵 {show.audio.name}
+                {show.audio.startOffset && show.audio.startOffset > 0 && (
+                  <span className="ml-2 text-blue-400">
+                    (starts at {formatTime(show.audio.startOffset)})
+                  </span>
+                )}
+              </div>
+              {/* Drag handle indicator */}
+              <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-blue-300 text-xs">⋮⋮</div>
               </div>
             </div>
           )}

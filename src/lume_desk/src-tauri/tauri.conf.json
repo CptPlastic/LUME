@@ -38,12 +38,7 @@
             "fs:allow-read-text-file",
             "fs:allow-exists",
             "fs:allow-create",
-            "fs:allow-write-file",
-            "updater:default",
-            "updater:allow-check",
-            "updater:allow-install",
-            "shell:default",
-            "shell:allow-open"
+            "fs:allow-write-file"
           ]
         }
       ]

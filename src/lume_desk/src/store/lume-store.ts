@@ -41,6 +41,7 @@ interface LumeStoreImpl extends LumeStore {
   // Audio and timeline management
   setShowAudio: (audioTrack: AudioTrack) => Promise<void>;
   removeShowAudio: () => void;
+  moveShowAudio: (newStartOffset: number) => void;
   restoreShowAudio: () => Promise<void>;
   moveSequence: (sequenceId: string, newTimestamp: number) => void;
   seekTo: (timestamp: number) => void;
@@ -690,8 +691,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
             console.log(`🎵 Starting audio playback: ${currentShow.audio.name}`);
             console.log(`🎵 Audio has file:`, !!currentShow.audio.file);
             console.log(`🎵 Audio has URL:`, !!currentShow.audio.url);
-            console.log(`🎵 Audio file type:`, currentShow.audio.file?.type);
-            console.log(`🎵 Audio file size:`, currentShow.audio.file?.size);
+            console.log(`🎵 Audio start offset:`, currentShow.audio.startOffset || 0);
             
             try {
               const audio = new Audio();
@@ -712,17 +712,27 @@ export const useLumeStore = create<LumeStoreImpl>()(
               }
               
               if (audio.src) {
-                // Start from current playback position, not always from 0
                 const { currentPlaybackTime } = get();
-                audio.currentTime = currentPlaybackTime / 1000; // Convert ms to seconds
-                console.log(`🎵 Starting audio from position: ${audio.currentTime}s (${currentPlaybackTime}ms)`);
-                console.log(`🎵 Attempting to play audio...`);
-                audio.play().then(() => {
-                  console.log(`✅ Audio playback started successfully from ${audio.currentTime}s`);
-                }).catch((error) => {
-                  console.error(`❌ Failed to start audio playback:`, error);
-                  alert(`Failed to play audio: ${error.message}`);
-                });
+                const audioStartOffset = currentShow.audio.startOffset || 0;
+                
+                // Only start audio if we're at or past the audio start time
+                if (currentPlaybackTime >= audioStartOffset) {
+                  // Calculate how far into the audio file we should be
+                  const audioFilePosition = (currentPlaybackTime - audioStartOffset) / 1000; // Convert ms to seconds
+                  audio.currentTime = Math.max(0, audioFilePosition);
+                  console.log(`🎵 Starting audio from timeline position: ${currentPlaybackTime}ms, audio file position: ${audioFilePosition}s`);
+                  
+                  audio.play().then(() => {
+                    console.log(`✅ Audio playback started successfully`);
+                  }).catch((error) => {
+                    console.error(`❌ Failed to start audio playback:`, error);
+                    alert(`Failed to play audio: ${error.message}`);
+                  });
+                } else {
+                  // Audio hasn't started yet, set up to start it when timeline reaches the start offset
+                  console.log(`🎵 Audio will start at ${audioStartOffset}ms (timeline is at ${currentPlaybackTime}ms)`);
+                  audio.currentTime = 0; // Ready to play from beginning when time comes
+                }
                 
                 // Store audio reference for potential stopping later
                 set({ currentAudio: audio });
@@ -744,6 +754,32 @@ export const useLumeStore = create<LumeStoreImpl>()(
             const elapsed = Date.now() - startTime;
             const newPlaybackTime = initialOffset + elapsed;
             set({ currentPlaybackTime: newPlaybackTime });
+            
+            // Check if audio should start playing now
+            const { currentShow, currentAudio } = get();
+            if (currentShow?.audio && currentAudio) {
+              const audioStartOffset = currentShow.audio.startOffset || 0;
+              const audioEndTime = audioStartOffset + (currentShow.audio.duration || 0);
+              
+              // If timeline just reached audio start time and audio isn't playing
+              if (newPlaybackTime >= audioStartOffset && 
+                  newPlaybackTime < audioEndTime && 
+                  currentAudio.paused) {
+                const audioFilePosition = (newPlaybackTime - audioStartOffset) / 1000;
+                currentAudio.currentTime = Math.max(0, audioFilePosition);
+                currentAudio.play().then(() => {
+                  console.log(`🎵 Audio started at timeline ${newPlaybackTime}ms, audio file position ${audioFilePosition}s`);
+                }).catch(error => {
+                  console.error(`❌ Failed to start delayed audio:`, error);
+                });
+              }
+              
+              // If timeline moved past audio end time, pause audio
+              if (newPlaybackTime >= audioEndTime && !currentAudio.paused) {
+                currentAudio.pause();
+                console.log(`🎵 Audio stopped at timeline ${newPlaybackTime}ms (audio ended)`);
+              }
+            }
           }, 100); // Update every 100ms for smooth progress
 
           // Store timer for cleanup
@@ -872,11 +908,17 @@ export const useLumeStore = create<LumeStoreImpl>()(
           const { currentShow } = get();
           if (!currentShow) return;
 
+          // Ensure audio has a startOffset (default to 0 if not set)
+          const audioWithOffset: AudioTrack = {
+            ...audioTrack,
+            startOffset: audioTrack.startOffset ?? 0
+          };
+
           // Store uploaded files persistently
-          if (audioTrack.file) {
+          if (audioWithOffset.file) {
             try {
-              await audioStorageService.storeAudioFile(audioTrack);
-              console.log(`💾 Audio file stored: ${audioTrack.name}`);
+              await audioStorageService.storeAudioFile(audioWithOffset);
+              console.log(`💾 Audio file stored: ${audioWithOffset.name}`);
             } catch (error) {
               console.error('Failed to store audio file:', error);
               // Continue anyway - the file will still work until page reload
@@ -885,11 +927,11 @@ export const useLumeStore = create<LumeStoreImpl>()(
 
           const updatedShow: Show = {
             ...currentShow,
-            audio: audioTrack,
+            audio: audioWithOffset,
             metadata: {
               ...currentShow.metadata,
               duration: Math.max(
-                audioTrack.duration,
+                audioWithOffset.duration,
                 currentShow.metadata.duration || 0,
                 ...currentShow.sequences.map(s => s.timestamp + (s.fireworkType?.duration || 0))
               )
@@ -918,6 +960,25 @@ export const useLumeStore = create<LumeStoreImpl>()(
           };
 
           set({ currentShow: updatedShow });
+        },
+
+        moveShowAudio: (newStartOffset: number) => {
+          const { currentShow } = get();
+          if (!currentShow?.audio) return;
+
+          const updatedAudio: AudioTrack = {
+            ...currentShow.audio,
+            startOffset: newStartOffset
+          };
+
+          const updatedShow: Show = {
+            ...currentShow,
+            audio: updatedAudio,
+            modifiedAt: new Date()
+          };
+
+          set({ currentShow: updatedShow });
+          console.log(`🎵 Audio moved to ${newStartOffset}ms (${Math.round(newStartOffset / 1000)}s)`);
         },
 
         restoreShowAudio: async () => {

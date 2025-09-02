@@ -195,6 +195,7 @@ export const ShowBuilder: React.FC = () => {
     currentPlaybackTime,
     setShowAudio,
     removeShowAudio,
+    moveShowAudio,
     moveSequence,
     seekTo,
     restoreShowAudio,
@@ -1001,6 +1002,7 @@ export const ShowBuilder: React.FC = () => {
             onSequenceUpdate={updateShowSequence}
             onAudioUpload={setShowAudio}
             onAudioRemove={removeShowAudio}
+            onAudioMove={moveShowAudio}
             onPlay={playShow}
             onPause={stopShow}
             onSeek={seekTo}
