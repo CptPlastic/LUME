@@ -7,7 +7,7 @@
 
 export interface ExportOptions {
   filename: string;
-  content: any; // Will be JSON.stringify'd
+  content: unknown; // Will be JSON.stringify'd
   fileExtension?: string;
   addTimestamp?: boolean;
 }
@@ -148,7 +148,7 @@ async function exportInBrowser(filename: string, content: string): Promise<boole
  * Convenience functions for common export types
  */
 
-export async function exportShow(showData: any, showName: string): Promise<boolean> {
+export async function exportShow(showData: unknown, showName: string): Promise<boolean> {
   return exportFile({
     filename: `${showName}-show.lume-show`,
     content: showData,
@@ -157,7 +157,7 @@ export async function exportShow(showData: any, showName: string): Promise<boole
   });
 }
 
-export async function exportFireworkTypes(fireworkData: any): Promise<boolean> {
+export async function exportFireworkTypes(fireworkData: unknown): Promise<boolean> {
   return exportFile({
     filename: 'firework-types-library',
     content: fireworkData,
@@ -166,7 +166,7 @@ export async function exportFireworkTypes(fireworkData: any): Promise<boolean> {
   });
 }
 
-export async function exportLightingEffects(lightingData: any): Promise<boolean> {
+export async function exportLightingEffects(lightingData: unknown): Promise<boolean> {
   return exportFile({
     filename: 'lighting-effects-library',
     content: lightingData,
