@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
+import { getAppVersion } from '../utils/version';
 
 interface HeaderProps {
   currentView: 'dashboard' | 'firework-types' | 'lighting-effects' | 'show-builder';
@@ -62,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
             <h1 className="text-2xl font-bold text-lume-primary">LUME</h1>
           </div>
           <div className="text-sm text-gray-400">
-            Desktop Controller v1.2.0
+            v{getAppVersion()}
           </div>
         </div>
 

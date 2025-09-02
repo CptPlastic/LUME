@@ -197,8 +197,7 @@ export const ShowBuilder: React.FC = () => {
     moveSequence,
     seekTo,
     restoreShowAudio,
-    importShow,
-    downloadShow
+    importShow
   } = useLumeStore();
 
   // File input ref for import
@@ -216,11 +215,51 @@ export const ShowBuilder: React.FC = () => {
     }
     
     try {
-      console.log('📤 Calling downloadShow with ID:', currentShow.id);
-      await downloadShow(currentShow.id);
-      console.log('✅ downloadShow completed successfully');
+      console.log('📤 Starting show export...');
+      console.log('🔍 Show details:', {
+        id: currentShow.id,
+        name: currentShow.name,
+        sequences: currentShow.sequences?.length || 0
+      });
+
+      // Import the export utility
+      console.log('📦 Importing export utilities...');
+      const { exportFile } = await import('../utils/export');
+      
+      // Get the data we need
+      console.log('📊 Getting store data...');
+      const { fireworkTypes, lightingEffectTypes, controllers } = useLumeStore.getState();
+      console.log('📊 Store data:', {
+        fireworkTypes: fireworkTypes.length,
+        lightingEffectTypes: lightingEffectTypes.length,
+        controllers: controllers.length
+      });
+      
+      // Create the export data using ShowService
+      console.log('🔧 Creating show file...');
+      const { ShowService } = await import('../services/show-service');
+      const showFile = await ShowService.exportShow(currentShow, fireworkTypes, lightingEffectTypes, controllers);
+      console.log('📄 Show file created, size:', JSON.stringify(showFile).length, 'chars');
+      
+      // Use the unified export
+      console.log('💾 Starting file export...');
+      const success = await exportFile({
+        filename: `${currentShow.name}-show.lume-show`,
+        content: showFile,
+        fileExtension: 'json',
+        addTimestamp: true
+      });
+      
+      if (success) {
+        console.log('✅ Show export completed successfully');
+        alert('✅ Show exported successfully!');
+      } else {
+        console.log('❌ Export was cancelled or failed');
+        alert('Export was cancelled or failed');
+      }
     } catch (error) {
       console.error('❌ Export failed:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       alert(`Failed to export show. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };

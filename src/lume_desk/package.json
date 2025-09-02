@@ -1,7 +1,7 @@
 {
   "name": "lume-desktop-controller",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "description": "LUME Desktop Controller - Professional firework and lighting control application",
   "author": "LUME Team",
@@ -22,6 +22,8 @@
     "@tailwindcss/forms": "^0.5.10",
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/cli": "^2.7.1",
+    "@tauri-apps/plugin-dialog": "^2.3.3",
+    "@tauri-apps/plugin-fs": "^2.4.2",
     "@types/node": "^24.2.1",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.11.0",

@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "LUME",
         "width": 1200,
         "height": 800,
@@ -22,7 +23,25 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Capability for the main window",
+          "windows": ["main"],
+          "permissions": [
+            "dialog:default",
+            "dialog:allow-save",
+            "dialog:allow-message",
+            "fs:default",
+            "fs:allow-write-text-file",
+            "fs:allow-read-text-file",
+            "fs:allow-exists",
+            "fs:allow-create",
+            "fs:allow-write-file"
+          ]
+        }
+      ]
     }
   },
   "bundle": {

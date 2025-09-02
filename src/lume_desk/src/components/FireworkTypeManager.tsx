@@ -66,113 +66,48 @@ export const FireworkTypeManager: React.FC = () => {
   };
 
   const handleExportLibrary = async () => {
-    console.log('Export button clicked, starting export process...');
+    console.log('🔽 Export firework types button clicked!');
     console.log('Firework types count:', fireworkTypes.length);
     
     try {
-      const showData = {
+      console.log('📤 Starting firework types export...');
+      console.log('🎆 Firework types count:', fireworkTypes.length);
+
+      const { exportFile } = await import('../utils/export');
+      
+      const exportData = {
         metadata: {
           name: "Firework Types Library",
-          description: "Complete firework types collection",
+          description: "Exported firework types for LUME shows",
           createdAt: new Date().toISOString(),
-          version: "1.0"
+          totalTypes: fireworkTypes.length
         },
-        fireworkTypes,
-        sequences: []
+        fireworkTypes: fireworkTypes,
+        version: "1.0"
       };
 
-      const jsonString = JSON.stringify(showData, null, 2);
-      const fileName = `firework-types-library-${new Date().toISOString().split('T')[0]}.json`;
+      console.log('💾 Starting firework types file export...');
+      const success = await exportFile({
+        filename: 'firework-types-library',
+        content: exportData,
+        fileExtension: 'json',
+        addTimestamp: true
+      });
       
-      // Check if we're in Tauri environment
-      const isTauri = '__TAURI__' in window;
-      console.log('Is Tauri environment:', isTauri);
-      
-      // In Tauri, downloads are often blocked, so we'll go straight to clipboard with good UX
-      if (isTauri) {
-        console.log('Using Tauri-optimized export...');
-        try {
-          await navigator.clipboard.writeText(jsonString);
-          alert(`🎆 Export Successful!\n\n📋 Your firework types library has been copied to the clipboard.\n\n📝 To save the file:\n1. Open any text editor (TextEdit, Notepad, VS Code, etc.)\n2. Paste the content (Cmd+V or Ctrl+V)\n3. Save as: "${fileName}"\n\nThe file contains ${fireworkTypes.length} firework types ready for import!`);
-          return;
-        } catch (clipboardError) {
-          console.warn('Clipboard failed in Tauri:', clipboardError);
-        }
+      if (success) {
+        console.log('✅ Firework types export completed successfully');
+        alert(`🎆 Export Successful!\n\nYour firework types library has been saved!\n\nThe file contains ${fireworkTypes.length} firework types ready for import.`);
+      } else {
+        alert('Export was cancelled');
       }
-      
-      // For browsers, try download first, then fallback
-      console.log('Attempting browser download...');
-      try {
-        // Method 1: Data URL download
-        const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(jsonString)}`;
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = fileName;
-        a.style.display = 'none';
-        
-        document.body.appendChild(a);
-        
-        // Try both click methods
-        a.click();
-        
-        const syntheticClick = new MouseEvent('click', {
-          view: window,
-          bubbles: true,
-          cancelable: true
-        });
-        a.dispatchEvent(syntheticClick);
-        
-        // Clean up
-        setTimeout(() => {
-          if (document.body.contains(a)) {
-            document.body.removeChild(a);
-          }
-        }, 1000);
-        
-        // Give download a moment to start
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Check with user if download worked
-        const downloadSuccess = confirm('🎆 Export initiated!\n\nDid a download start? Check your Downloads folder.\n\nClick OK if the file was downloaded, or Cancel to try clipboard method.');
-        
-        if (downloadSuccess) {
-          alert(`✅ Great! Your firework types library has been saved as "${fileName}"`);
-          return;
-        }
-        
-        console.log('User indicated download failed, trying clipboard...');
-        
-      } catch (downloadError) {
-        console.warn('Download method failed:', downloadError);
-      }
-      
-      // Fallback: Clipboard with enhanced UX
-      console.log('Using clipboard fallback...');
-      try {
-        await navigator.clipboard.writeText(jsonString);
-        
-        const viewData = confirm(`🎆 Export via Clipboard!\n\n📋 Your firework types library has been copied to the clipboard.\n\n📝 Next steps:\n1. Open a text editor\n2. Paste (Cmd+V or Ctrl+V)\n3. Save as: "${fileName}"\n\nClick OK to continue, or Cancel to view the data first.`);
-        
-        if (!viewData) {
-          // Show data in a nice modal
-          showExportModal(jsonString, fileName);
-        }
-        
-        return;
-        
-      } catch (clipboardError) {
-        console.warn('Clipboard failed:', clipboardError);
-        alert('Clipboard access denied. Showing data for manual copy...');
-        showExportModal(jsonString, fileName);
-      }
-      
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error('❌ Export failed:', error);
       alert(`❌ Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  // Helper function to show export data in a modal
+  // LEGACY FUNCTION - COMMENTED OUT
+  /*
   const showExportModal = (jsonString: string, fileName: string) => {
     const modal = document.createElement('div');
     modal.style.cssText = `
@@ -315,6 +250,7 @@ export const FireworkTypeManager: React.FC = () => {
     };
     document.addEventListener('keydown', handleEscape);
   };
+  */
 
     const handleImportFireworks = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];

@@ -1,5 +1,6 @@
 import type { Show, ShowFile, FireworkType, LightingEffectType, ESP32Controller, AudioTrack } from '../types';
 import { audioStorageService } from './audio-storage';
+import { DATA_FORMAT_VERSION } from '../utils/version';
 
 export class ShowService {
   
@@ -73,7 +74,7 @@ export class ShowService {
     }
 
     return {
-      version: '1.1.0', // Increment version to support audio
+      version: DATA_FORMAT_VERSION, // Data format version for show files
       format: 'lume-show-v1',
       metadata: {
         name: show.name,
@@ -255,23 +256,76 @@ export class ShowService {
   }
 
   // Download show file with enhanced name
-  static downloadShowFile(showFile: ShowFile): void {
-    const blob = new Blob([JSON.stringify(showFile, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+  static async downloadShowFile(showFile: ShowFile): Promise<void> {
+    console.log('🔄 downloadShowFile called with show:', showFile.metadata.name);
     
     // Enhanced filename with audio indicator
     const audioSuffix = showFile.audioData ? '-with-audio' : '';
     const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    a.download = `${showFile.metadata.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}${audioSuffix}-${timestamp}.lume-show.json`;
+    const filename = `${showFile.metadata.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}${audioSuffix}-${timestamp}.lume-show.json`;
+    const content = JSON.stringify(showFile, null, 2);
+
+    console.log('📝 Generated filename:', filename);
+    console.log('📄 Content size:', content.length, 'chars');
+
+    // Check if running in Tauri
+    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+    console.log('🖥️ Environment:', isTauri ? 'Tauri' : 'Browser');
+    
+    if (isTauri) {
+      try {
+        console.log('💾 Using Tauri save dialog...');
+        
+        // Use Tauri's save dialog
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        
+        console.log('📦 Imported Tauri plugins successfully');
+        
+        const filePath = await save({
+          filters: [{
+            name: 'LUME Show Files',
+            extensions: ['json']
+          }],
+          defaultPath: filename
+        });
+        
+        console.log('📁 User selected path:', filePath);
+        
+        if (filePath) {
+          console.log('✍️ Writing file to:', filePath);
+          await writeTextFile(filePath, content);
+          console.log('✅ Show exported successfully to:', filePath);
+        } else {
+          console.log('❌ User cancelled the save dialog');
+        }
+      } catch (error) {
+        console.error('❌ Tauri export failed:', error);
+        console.log('🔄 Falling back to browser download...');
+        // Fallback to browser download
+        this.browserDownload(content, filename);
+      }
+    } else {
+      console.log('🌐 Using browser download...');
+      // Browser environment
+      this.browserDownload(content, filename);
+    }
+    
+    console.log(`📁 Download process completed for: ${showFile.metadata.name}${audioSuffix}`);
+  }
+
+  // Browser download fallback
+  private static browserDownload(content: string, filename: string): void {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
     
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    console.log(`📁 Downloaded show: ${showFile.metadata.name}${audioSuffix}`);
   }
 
   // Validate show for safety (enhanced for lighting effects)

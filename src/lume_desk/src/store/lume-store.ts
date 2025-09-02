@@ -648,7 +648,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
             
             // Export the show directly
             const showFile = await ShowService.exportShow(currentShow, fireworkTypes, lightingEffectTypes, controllers);
-            ShowService.downloadShowFile(showFile);
+            await ShowService.downloadShowFile(showFile);
             
             console.log('✅ Show export completed');
           } catch (error) {

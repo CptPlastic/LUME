@@ -1,4 +1,5 @@
 import type { FireworkType, ShowFile, Show, ESP32Controller } from '../types';
+import { FIREWORK_FORMAT_VERSION } from '../utils/version';
 
 export class FireworkService {
   
@@ -143,7 +144,7 @@ export class FireworkService {
       }));
 
     return {
-      version: '1.0.0',
+      version: FIREWORK_FORMAT_VERSION,
       format: 'lume-show-v1',
       metadata: {
         name: show.name,

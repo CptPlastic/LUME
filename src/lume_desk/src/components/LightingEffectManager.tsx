@@ -270,65 +270,48 @@ export const LightingEffectManager: React.FC = () => {
   };
 
   const handleExportLibrary = async () => {
-    console.log('🎆 Exporting lighting effects library...');
+    console.log('🔽 Export lighting effects button clicked!');
     console.log('Lighting effect types count:', lightingEffectTypes.length);
     
     try {
+      console.log('📤 Starting lighting effects export...');
+      console.log('💡 Lighting effect types count:', lightingEffectTypes.length);
+
+      const { exportFile } = await import('../utils/export');
+      
       const exportData = {
         metadata: {
           name: "Lighting Effects Library",
-          description: "Complete lighting effects collection",
+          description: "Exported lighting effects for LUME shows",
           createdAt: new Date().toISOString(),
-          version: "1.0"
+          totalEffects: lightingEffectTypes.length
         },
-        lightingEffectTypes,
-        format: "lume-lighting-effects-v1"
+        lightingEffectTypes: lightingEffectTypes,
+        version: "1.0"
       };
 
-      const jsonString = JSON.stringify(exportData, null, 2);
-      const fileName = `lighting-effects-library-${new Date().toISOString().split('T')[0]}.json`;
+      console.log('💾 Starting lighting effects file export...');
+      const success = await exportFile({
+        filename: 'lighting-effects-library',
+        content: exportData,
+        fileExtension: 'json',
+        addTimestamp: true
+      });
       
-      // Check if we're in Tauri environment
-      const isTauri = '__TAURI__' in window;
-      console.log('Is Tauri environment:', isTauri);
-      
-      // In Tauri, use clipboard with good UX
-      if (isTauri) {
-        console.log('Using Tauri-optimized export...');
-        try {
-          await navigator.clipboard.writeText(jsonString);
-          alert(`💡 Export Successful!\n\n📋 Your lighting effects library has been copied to the clipboard.\n\n📝 To save the file:\n1. Open any text editor (TextEdit, Notepad, VS Code, etc.)\n2. Paste the content (Cmd+V or Ctrl+V)\n3. Save as: "${fileName}"\n\nThe file contains ${lightingEffectTypes.length} lighting effects ready for import!`);
-          return;
-        } catch (clipboardError) {
-          console.warn('Clipboard failed in Tauri:', clipboardError);
-        }
-      }
-      
-      // For browsers, try download
-      console.log('Attempting browser download...');
-      try {
-        const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(jsonString)}`;
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = fileName;
-        a.style.display = 'none';
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        alert(`💡 Export Complete!\n\nDownloaded: ${fileName}\nEffects: ${lightingEffectTypes.length}\n\nYour lighting effects library is ready for sharing!`);
-      } catch (downloadError) {
-        console.warn('Download failed, using fallback modal...', downloadError);
-        // Show modal with content for manual copy
-        showExportModal(jsonString, fileName);
+      if (success) {
+        console.log('✅ Lighting effects export completed successfully');
+        alert(`💡 Export Successful!\n\nYour lighting effects library has been saved!\n\nThe file contains ${lightingEffectTypes.length} lighting effects ready for import.`);
+      } else {
+        alert('Export was cancelled');
       }
     } catch (error) {
       console.error('❌ Export failed:', error);
-      alert('Failed to export lighting effects library. Please try again.');
+      alert(`❌ Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
+  // LEGACY FUNCTION - COMMENTED OUT
+  /*
   const showExportModal = (jsonString: string, fileName: string) => {
     // Create modal for manual copy (fallback)
     const modal = document.createElement('div');
@@ -408,6 +391,7 @@ export const LightingEffectManager: React.FC = () => {
     modal.appendChild(content);
     document.body.appendChild(modal);
   };
+  */
 
   const handleImportLibrary = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
