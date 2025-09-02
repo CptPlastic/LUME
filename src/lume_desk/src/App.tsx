@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { FireworkTypeManager } from './components/FireworkTypeManager';
 import { LightingEffectManager } from './components/LightingEffectManager';
 import { ShowBuilder } from './components/ShowBuilder';
+import { UpdateNotification } from './components/UpdateNotification';
 import { audioStorageService } from './services/audio-storage';
 import { useLumeStore } from './store/lume-store';
 
@@ -15,6 +16,7 @@ function App() {
   
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showUpdateNotification, setShowUpdateNotification] = useState(true);
   const { restoreShowAudio, currentShow } = useLumeStore();
 
   // Initialize app and restore audio on startup
@@ -114,6 +116,16 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <Header currentView={currentView} onViewChange={setCurrentView} />
+      
+      {/* Update Notification - shows network status and version updates */}
+      {showUpdateNotification && (
+        <div className="p-4 bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <UpdateNotification onDismiss={() => setShowUpdateNotification(false)} />
+          </div>
+        </div>
+      )}
+      
       {renderCurrentView()}
     </div>
   );

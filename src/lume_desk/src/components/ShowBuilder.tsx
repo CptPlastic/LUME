@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Play, Pause, Settings, Clock, Lightbulb, Zap, Download, Upload } from 'lucide-react';
+import { Play, Pause, Settings, Clock, Lightbulb, Zap, Download, Upload, AlertCircle } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
+import { VersionService } from '../services/version-service';
 import type { ShowSequence, FireworkType, LightingEffectType, ShowFile } from '../types';
 import { EnhancedShowTimeline } from './EnhancedShowTimeline';
 
@@ -447,6 +448,10 @@ export const ShowBuilder: React.FC = () => {
       sequenceTime
     });
 
+    // Check if offline mode is enabled
+    const isOfflineMode = VersionService.isOfflineModeEnabled();
+    console.log('🌐 Offline mode enabled:', isOfflineMode);
+
     if (effectTab === 'fireworks') {
       if (!selectedFireworkType) {
         alert('Please select a firework type');
@@ -458,8 +463,9 @@ export const ShowBuilder: React.FC = () => {
         return;
       }
 
-      if (!selectedController) {
-        alert('Please select a controller');
+      // In offline mode, allow building shows without controllers
+      if (!selectedController && !isOfflineMode) {
+        alert('Please select a controller or enable offline mode to build shows without controllers');
         return;
       }
 
@@ -468,7 +474,7 @@ export const ShowBuilder: React.FC = () => {
         timestamp: sequenceTime * 1000, // Convert to milliseconds
         fireworkTypeId: selectedFireworkType.id,
         fireworkType: selectedFireworkType,
-        controllerId: selectedController,
+        controllerId: selectedController || 'offline-firework-controller',
         area: selectedArea,
         channel: selectedChannel,
         delay: 0,
@@ -493,8 +499,9 @@ export const ShowBuilder: React.FC = () => {
         return;
       }
 
-      if (!selectedController) {
-        alert('Please select a controller');
+      // In offline mode, allow building shows without controllers
+      if (!selectedController && !isOfflineMode) {
+        alert('Please select a controller or enable offline mode to build shows without controllers');
         return;
       }
 
@@ -503,7 +510,7 @@ export const ShowBuilder: React.FC = () => {
         timestamp: sequenceTime * 1000, // Convert to milliseconds
         lightingEffectTypeId: selectedLightingEffect.id,
         lightingEffectType: selectedLightingEffect,
-        controllerId: selectedController,
+        controllerId: selectedController || 'offline-lighting-controller',
         area: selectedArea,
         relays: selectedRelays.length > 0 ? selectedRelays : undefined, // Use selected relays or all relays
         duration: effectDuration * 1000, // Convert to milliseconds
@@ -533,8 +540,43 @@ export const ShowBuilder: React.FC = () => {
     return `${remainingSeconds}.${ms}s`;
   };
 
+  // Check if offline mode is enabled for UI display
+  const isOfflineMode = VersionService.isOfflineModeEnabled();
+  const hasConnectedControllers = controllers.some(c => c.status === 'connected');
+
   return (
     <div className="space-y-6">
+      {/* Offline Mode Warning */}
+      {isOfflineMode && (
+        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-yellow-200 font-medium">Offline Mode Active</h3>
+              <p className="text-sm text-yellow-300 mt-1">
+                Building shows without controller validation. Shows will be saved with placeholder controllers.
+                When you connect to the LUME network later, you can assign real controllers to sequences.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Controllers Warning (when not in offline mode) */}
+      {!isOfflineMode && !hasConnectedControllers && (
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-blue-200 font-medium">No Controllers Connected</h3>
+              <p className="text-sm text-blue-300 mt-1">
+                Connect to LUME controllers to build shows, or enable offline mode to build shows without validation.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

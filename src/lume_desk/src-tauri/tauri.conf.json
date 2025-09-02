@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "LUME",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "identifier": "com.lume.controller",
   "build": {
     "frontendDist": "../dist",
@@ -38,7 +38,12 @@
             "fs:allow-read-text-file",
             "fs:allow-exists",
             "fs:allow-create",
-            "fs:allow-write-file"
+            "fs:allow-write-file",
+            "updater:default",
+            "updater:allow-check",
+            "updater:allow-install",
+            "shell:default",
+            "shell:allow-open"
           ]
         }
       ]
