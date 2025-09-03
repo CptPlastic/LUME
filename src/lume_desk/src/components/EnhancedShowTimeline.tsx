@@ -53,7 +53,7 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
     setRelays(prev => 
       prev.includes(relayNum) 
         ? prev.filter(r => r !== relayNum)
-        : [...prev, relayNum].sort()
+        : [...prev, relayNum].sort((a, b) => a - b)
     );
   };
 
@@ -89,11 +89,12 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
         <div className="space-y-4">
           {/* Timestamp */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="sequence-timestamp" className="block text-sm font-medium text-gray-300 mb-2">
               Time (seconds)
             </label>
             <div className="flex items-center space-x-3">
               <input
+                id="sequence-timestamp"
                 type="number"
                 min="0"
                 step="0.01"
@@ -109,10 +110,11 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
 
           {/* Controller Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="sequence-controller" className="block text-sm font-medium text-gray-300 mb-2">
               Controller
             </label>
             <select
+              id="sequence-controller"
               value={controllerId}
               onChange={(e) => setControllerId(e.target.value)}
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
@@ -120,9 +122,11 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
               {/* Offline/placeholder controllers first */}
               {(controllerId.startsWith('offline-') || !controllers.some(c => c.id === controllerId)) && (
                 <option value={controllerId}>
-                  {controllerId.includes('firework') ? '🎆 Offline Firework Controller' : 
-                   controllerId.includes('lighting') ? '💡 Offline Lighting Controller' : 
-                   `📡 ${controllerId}`}
+                  {(() => {
+                    if (controllerId.includes('firework')) return '🎆 Offline Firework Controller';
+                    if (controllerId.includes('lighting')) return '💡 Offline Lighting Controller';
+                    return `📡 ${controllerId}`;
+                  })()}
                 </option>
               )}
               
@@ -154,10 +158,11 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
           {/* Area & Channel */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="sequence-area" className="block text-sm font-medium text-gray-300 mb-2">
                 Area (1-99)
               </label>
               <input
+                id="sequence-area"
                 type="number"
                 min="1"
                 max="99"
@@ -168,10 +173,11 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="sequence-channel" className="block text-sm font-medium text-gray-300 mb-2">
                 Channel (1-12)
               </label>
               <input
+                id="sequence-channel"
                 type="number"
                 min="1"
                 max="12"
@@ -187,10 +193,11 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
             <>
               {/* Duration */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="sequence-duration" className="block text-sm font-medium text-gray-300 mb-2">
                   Duration (seconds)
                 </label>
                 <input
+                  id="sequence-duration"
                   type="number"
                   min="0.1"
                   step="0.1"
@@ -201,10 +208,10 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
               </div>
 
               {/* Relay Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
+              <fieldset>
+                <legend className="block text-sm font-medium text-gray-300 mb-3">
                   Relay Channels (1-12)
-                </label>
+                </legend>
                 <div className="grid grid-cols-6 gap-2">
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(relayNum => (
                     <button
@@ -216,6 +223,7 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
                           ? 'bg-lume-primary border-lume-primary text-white'
                           : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                       }`}
+                      aria-pressed={relays.includes(relayNum)}
                     >
                       {relayNum}
                     </button>
@@ -224,7 +232,7 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
                 <p className="text-xs text-gray-400 mt-2">
                   {relays.length === 0 ? 'No channels selected (will use all relays)' : `Selected: ${relays.join(', ')}`}
                 </p>
-              </div>
+              </fieldset>
             </>
           )}
         </div>
@@ -987,6 +995,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
             style={{ height: WAVEFORM_HEIGHT, width: timelineWidth, minWidth: timelineWidth }}
           >
             {/* Draggable Audio Container */}
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
             <div 
               className={`absolute bg-gradient-to-r from-blue-900/20 to-blue-800/20 border-2 border-blue-500/30 hover:border-blue-400/50 rounded cursor-move transition-all group ${
                 isDraggingAudio ? 'opacity-75 scale-105 border-blue-400' : ''
@@ -1072,7 +1081,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                   
                   return (
                     <rect
-                      key={`waveform-${index}`}
+                      key={`waveform-${timelineTimePosition}-${index}`}
                       x={x}
                       y={topY}
                       width={barWidth}
@@ -1108,15 +1117,37 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
         )}
 
         {/* Main Timeline Tracks */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
         <div
           ref={timelineRef}
           className="relative cursor-pointer"
+          tabIndex={0}
+          aria-label="Timeline editor - Click to seek, use arrow keys to navigate, space to play/pause"
           style={{ 
             height: TRACK_HEIGHT * 2 + 20, // Two tracks + padding
             width: timelineWidth,
             minWidth: timelineWidth
           }}
           onClick={handleTimelineClick}
+          onKeyDown={(e) => {
+            const step = 1000; // 1 second step
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              onSeek(Math.max(0, currentTime - step));
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              onSeek(Math.min(maxDuration, currentTime + step));
+            } else if (e.key === 'Home') {
+              e.preventDefault();
+              onSeek(0);
+            } else if (e.key === 'End') {
+              e.preventDefault();
+              onSeek(maxDuration);
+            } else if (e.key === ' ') {
+              e.preventDefault();
+              isPlaying ? onPause() : onPlay();
+            }
+          }}
           onMouseMove={(e) => {
             handleMouseMove(e);
             handleTimelineMouseMove(e);
@@ -1146,6 +1177,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                   currentTime <= sequence.timestamp + (sequence.fireworkType?.duration || 1000);
                 
                 return (
+                  /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */
                   <div
                     key={sequence.id}
                     className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
@@ -1219,6 +1251,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                 const sequenceDuration = sequence.duration || sequence.lightingEffectType?.duration || 5000;
                 
                 return (
+                  /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */
                   <div
                     key={sequence.id}
                     className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
@@ -1245,6 +1278,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                     </span>
                     <div className="flex items-center">
                       {/* Resize handle */}
+                      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
                       <div
                         className="w-1 h-6 bg-blue-300 hover:bg-blue-200 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity mr-1 rounded"
                         onMouseDown={(e) => handleResizeStart(e, sequence.id)}
@@ -1338,8 +1372,16 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
           {show.audio && (
             <div className="flex items-center space-x-2 text-xs">
               <span className="text-gray-500">•</span>
-              <span className={`${show.audio.file ? 'text-green-400' : show.audio.url ? 'text-blue-400' : 'text-red-400'}`}>
-                Audio: {show.audio.file ? 'File ✓' : show.audio.url ? 'URL ✓' : 'Missing ✗'}
+              <span className={(() => {
+                if (show.audio.file) return 'text-green-400';
+                if (show.audio.url) return 'text-blue-400';
+                return 'text-red-400';
+              })()}>
+                Audio: {(() => {
+                  if (show.audio.file) return 'File ✓';
+                  if (show.audio.url) return 'URL ✓';
+                  return 'Missing ✗';
+                })()}
               </span>
               {show.audio.id && (
                 <span className="text-gray-500">ID: {show.audio.id.slice(-6)}</span>
