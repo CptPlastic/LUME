@@ -1,19 +1,20 @@
 {
   "name": "lume-desktop-controller",
   "private": true,
-  "version": "1.2.4",
+  "version": "1.2.5",
   "type": "module",
   "description": "LUME Desktop Controller - Professional firework and lighting control application",
   "author": "LUME Team",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:version-info": "echo 'Build info:' && echo 'Version:' $(node -p 'require(\"./package.json\").version').$(git rev-parse --short HEAD 2>/dev/null || echo 'dev') && echo 'Date:' $(date -I)",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:bundle": "tauri build --bundles all"
+    "tauri:build": "npm run build:version-info && tauri build",
+    "tauri:bundle": "npm run build:version-info && tauri build --bundles all"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

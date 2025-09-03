@@ -946,7 +946,9 @@ export const ShowBuilder: React.FC = () => {
 
           <div className="mt-6">
             <label htmlFor="controller-select" className="block text-sm font-medium text-gray-300 mb-2">
-              Controller
+              Controller {effectTab === 'lighting' && controllers.filter(c => c.type === 'lights' && c.status === 'connected').length > 1 && (
+                <span className="text-xs text-yellow-400">({controllers.filter(c => c.type === 'lights' && c.status === 'connected').length} lighting controllers available)</span>
+              )}
             </label>
             <select
               id="controller-select"
@@ -955,17 +957,62 @@ export const ShowBuilder: React.FC = () => {
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent text-lg"
             >
               <option value="">Select a controller...</option>
+              {/* Show all controllers but highlight the appropriate ones */}
               {controllers
                 .filter(c => c.status === 'connected')
-                .map(controller => (
-                  <option key={controller.id} value={controller.id}>
-                    {controller.name} ({controller.type})
-                  </option>
-                ))}
+                .sort((a, b) => {
+                  // Sort by relevance to current effect type
+                  const aRelevant = (effectTab === 'fireworks' && a.type === 'firework') || (effectTab === 'lighting' && a.type === 'lights');
+                  const bRelevant = (effectTab === 'fireworks' && b.type === 'firework') || (effectTab === 'lighting' && b.type === 'lights');
+                  if (aRelevant && !bRelevant) return -1;
+                  if (!aRelevant && bRelevant) return 1;
+                  return a.name.localeCompare(b.name);
+                })
+                .map(controller => {
+                  const isRelevant = (effectTab === 'fireworks' && controller.type === 'firework') || (effectTab === 'lighting' && controller.type === 'lights');
+                  const statusIcon = controller.status === 'connected' ? '🟢' : '🔴';
+                  const typeIcon = controller.type === 'firework' ? '🎆' : '💡';
+                  const relevancyPrefix = isRelevant ? '' : '⚪ ';
+                  
+                  return (
+                    <option 
+                      key={controller.id} 
+                      value={controller.id}
+                      style={{ fontWeight: isRelevant ? 'bold' : 'normal' }}
+                    >
+                      {relevancyPrefix}{statusIcon} {typeIcon} {controller.name} ({controller.type})
+                    </option>
+                  );
+                })}
             </select>
+            
+            {/* Enhanced status messages */}
             {controllers.filter(c => c.status === 'connected').length === 0 && (
               <p className="text-sm text-red-400 mt-2">
                 No controllers connected. Go to Controllers tab to scan for devices.
+              </p>
+            )}
+            
+            {effectTab === 'lighting' && controllers.filter(c => c.type === 'lights' && c.status === 'connected').length > 1 && (
+              <div className="text-sm text-blue-300 mt-2 p-2 bg-blue-900/20 rounded">
+                <strong>Multiple lighting controllers detected:</strong>
+                <ul className="ml-4 mt-1">
+                  {controllers
+                    .filter(c => c.type === 'lights' && c.status === 'connected')
+                    .map(controller => (
+                      <li key={controller.id} className="text-xs">
+                        💡 {controller.name} - {controller.ip || 'IP unknown'}
+                      </li>
+                    ))}
+                </ul>
+                <p className="text-xs text-gray-400 mt-1">Select the controller you want to use for this lighting effect.</p>
+              </div>
+            )}
+            
+            {/* Offline mode indicator */}
+            {isOfflineMode && (
+              <p className="text-sm text-yellow-400 mt-2">
+                ℹ️ Offline mode: Controllers will be assigned as placeholders. You can reassign them when real controllers are connected.
               </p>
             )}
           </div>

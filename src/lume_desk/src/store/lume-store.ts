@@ -14,6 +14,7 @@ interface LumeStoreImpl extends LumeStore {
   showTimeouts: NodeJS.Timeout[];
   currentPlaybackTime: number; // Current playback position in milliseconds
   currentAudio: HTMLAudioElement | null; // Current audio element for playback
+  statusRefreshInterval: NodeJS.Timeout | null; // For periodic status checking
   
   // Enhanced controller actions
   scanForControllers: () => Promise<void>;
@@ -45,6 +46,11 @@ interface LumeStoreImpl extends LumeStore {
   restoreShowAudio: () => Promise<void>;
   moveSequence: (sequenceId: string, newTimestamp: number) => void;
   seekTo: (timestamp: number) => void;
+  
+  // Status refresh management
+  startStatusRefresh: () => void;
+  stopStatusRefresh: () => void;
+  refreshControllerStatus: () => Promise<void>;
 }
 
 export const useLumeStore = create<LumeStoreImpl>()(
@@ -65,6 +71,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         showTimeouts: [],
         currentPlaybackTime: 0,
         currentAudio: null,
+        statusRefreshInterval: null,
 
         // Basic controller management
         addController: (controller: ESP32Controller) => {
@@ -1074,6 +1081,74 @@ export const useLumeStore = create<LumeStoreImpl>()(
 
         seekTo: (timestamp: number) => {
           set({ currentPlaybackTime: Math.max(0, timestamp) });
+        },
+        
+        // Status refresh management for real-time controller monitoring
+        startStatusRefresh: () => {
+          const { statusRefreshInterval } = get();
+          
+          // Don't start if already running
+          if (statusRefreshInterval) return;
+          
+          console.log('🔄 Starting controller status refresh (every 10 seconds)');
+          const interval = setInterval(() => {
+            get().refreshControllerStatus();
+          }, 10000); // Check every 10 seconds
+          
+          set({ statusRefreshInterval: interval });
+          
+          // Also do an immediate check
+          get().refreshControllerStatus();
+        },
+        
+        stopStatusRefresh: () => {
+          const { statusRefreshInterval } = get();
+          
+          if (statusRefreshInterval) {
+            clearInterval(statusRefreshInterval);
+            set({ statusRefreshInterval: null });
+            console.log('🛑 Stopped controller status refresh');
+          }
+        },
+        
+        refreshControllerStatus: async () => {
+          const { controllers, apis, updateControllerStatus } = get();
+          
+          if (controllers.length === 0) return;
+          
+          console.log(`🔍 Refreshing status for ${controllers.length} controllers...`);
+          
+          // Check each controller status in parallel
+          const statusChecks = controllers.map(async (controller) => {
+            const api = apis.get(controller.id);
+            if (!api) {
+              console.log(`⚠️ No API instance for controller ${controller.id}`);
+              return;
+            }
+            
+            try {
+              // Try to ping the controller
+              const isOnline = await api.ping();
+              const newStatus: ESP32Controller['status'] = isOnline ? 'connected' : 'disconnected';
+              
+              // Only update if status changed
+              if (controller.status !== newStatus) {
+                console.log(`📡 Controller ${controller.name} status changed: ${controller.status} → ${newStatus}`);
+                updateControllerStatus(controller.id, { 
+                  status: newStatus,
+                  lastSeen: isOnline ? new Date() : controller.lastSeen
+                });
+              }
+            } catch (error) {
+              // Network error - mark as disconnected if not already
+              if (controller.status !== 'disconnected' && controller.status !== 'error') {
+                console.log(`❌ Controller ${controller.name} ping failed:`, error);
+                updateControllerStatus(controller.id, { status: 'error' });
+              }
+            }
+          });
+          
+          await Promise.all(statusChecks);
         },
       }),
       {

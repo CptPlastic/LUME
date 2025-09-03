@@ -17,7 +17,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isInitialized, setIsInitialized] = useState(false);
   const [showUpdateNotification, setShowUpdateNotification] = useState(true);
-  const { restoreShowAudio, currentShow } = useLumeStore();
+  const { restoreShowAudio, currentShow, startStatusRefresh, stopStatusRefresh } = useLumeStore();
 
   // Initialize app and restore audio on startup
   useEffect(() => {
@@ -55,6 +55,10 @@ function App() {
           console.log('ℹ️ No current show or audio to restore');
         }
         
+        // Start controller status refresh
+        console.log('🔄 Starting controller status refresh...');
+        startStatusRefresh();
+        
         setIsInitialized(true);
         console.log('✅ App initialization complete');
       } catch (error) {
@@ -66,6 +70,14 @@ function App() {
 
     initializeApp();
   }, [restoreShowAudio, currentShow]);
+  
+  // Cleanup status refresh on unmount
+  useEffect(() => {
+    return () => {
+      console.log('🧹 App unmounting, stopping status refresh...');
+      stopStatusRefresh();
+    };
+  }, [stopStatusRefresh]);
 
   // Show loading state during initialization
   if (!isInitialized) {

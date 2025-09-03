@@ -11,11 +11,13 @@ interface SequenceEditModalProps {
 }
 
 const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave, onCancel }) => {
+  const { controllers } = useLumeStore();
   const [timestamp, setTimestamp] = useState(sequence.timestamp);
   const [area, setArea] = useState(sequence.area || 1);
   const [channel, setChannel] = useState(sequence.channel || 1);
   const [duration, setDuration] = useState(sequence.duration || 0);
   const [relays, setRelays] = useState<number[]>(sequence.relays || []);
+  const [controllerId, setControllerId] = useState(sequence.controllerId);
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -34,6 +36,7 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
       timestamp,
       area,
       channel,
+      controllerId,
     };
 
     if (sequence.type === 'lighting') {
@@ -102,6 +105,50 @@ const SequenceEditModal: React.FC<SequenceEditModalProps> = ({ sequence, onSave,
                 {formatTime(timestamp)}
               </span>
             </div>
+          </div>
+
+          {/* Controller Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Controller
+            </label>
+            <select
+              value={controllerId}
+              onChange={(e) => setControllerId(e.target.value)}
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-lume-primary focus:border-transparent"
+            >
+              {/* Offline/placeholder controllers first */}
+              {(controllerId.startsWith('offline-') || !controllers.some(c => c.id === controllerId)) && (
+                <option value={controllerId}>
+                  {controllerId.includes('firework') ? '🎆 Offline Firework Controller' : 
+                   controllerId.includes('lighting') ? '💡 Offline Lighting Controller' : 
+                   `📡 ${controllerId}`}
+                </option>
+              )}
+              
+              {/* Real controllers */}
+              {controllers
+                .filter(c => {
+                  // Show controllers of the same type or any connected controller
+                  if (sequence.type === 'firework') {
+                    return c.type === 'firework';
+                  } else if (sequence.type === 'lighting') {
+                    return c.type === 'lights';
+                  }
+                  return true;
+                })
+                .map(controller => (
+                  <option key={controller.id} value={controller.id}>
+                    {controller.status === 'connected' ? '🟢' : '🔴'} {controller.name} ({controller.type})
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {controllerId.startsWith('offline-') 
+                ? 'Using offline controller - will need to be reassigned when controllers are connected' 
+                : 'Controller assignment for this sequence'
+              }
+            </p>
           </div>
 
           {/* Area & Channel */}
@@ -257,20 +304,23 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
   const audioInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Timeline configuration
-  const TRACK_HEIGHT = 80; // Height of each track
-  const RULER_HEIGHT = 40; // Height of time ruler - increased for better time display
-  const WAVEFORM_HEIGHT = 60; // Height of audio waveform
-  const MIN_SEQUENCE_WIDTH = 20; // Minimum width for sequences - smaller for precision
+  // Timeline configuration - standardize all track heights for proper alignment
+  const TRACK_HEIGHT = 70; // Height of each track (standardized)
+  const RULER_HEIGHT = 50; // Height of time ruler
+  const WAVEFORM_HEIGHT = 70; // Height of audio waveform (matches track height)
+  const MIN_SEQUENCE_WIDTH = 20; // Minimum width for sequences
   
   // Calculate timeline dimensions with minimum width for scrolling
   useEffect(() => {
     const updateWidth = () => {
       if (timelineRef.current?.parentElement) {
         const containerWidth = timelineRef.current.parentElement.clientWidth;
-        // For zoomed views, ensure timeline is wide enough to scroll
-        const minWidth = zoom > 1 ? Math.max(1600, containerWidth * zoom) : Math.max(800, containerWidth - 80);
-        setTimelineWidth(minWidth);
+        // Calculate timeline width based on content and zoom level
+        // Use the max duration to determine how much width we need
+        const baseWidth = Math.max(1200, containerWidth - 80);
+        // For zoom, we need more pixels per unit of time
+        const zoomedWidth = baseWidth * zoom;
+        setTimelineWidth(zoomedWidth);
       }
     };
     
@@ -295,7 +345,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
   );
   
   const maxDuration = show.audio?.duration || maxSequenceDuration;
-  const zoomedDuration = maxDuration / zoom;
+  // When zoomed in, we show the same duration but with more pixels per unit time
+  const zoomedDuration = maxDuration;
 
   // Convert timestamp to pixel position
   const timestampToPixel = useCallback((timestamp: number) => {
@@ -315,6 +366,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
   // Handle sequence dragging
   const handleMouseDown = (e: React.MouseEvent, sequenceId: string) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(sequenceId);
     
     const rect = timelineRef.current?.getBoundingClientRect();
@@ -322,7 +374,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
       const sequence = show.sequences.find(s => s.id === sequenceId);
       if (sequence) {
         const sequencePixel = timestampToPixel(sequence.timestamp);
-        setDragOffset(e.clientX - rect.left - sequencePixel);
+        const offset = e.clientX - rect.left - sequencePixel;
+        setDragOffset(offset);
       }
     }
   };
@@ -391,8 +444,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
     if (isDragging || isDraggingAudio || isResizing) return;
     
     const rect = timelineRef.current?.getBoundingClientRect();
-    if (rect && e.clientX >= rect.left + 12) { // Account for label offset
-      const clickPixel = e.clientX - rect.left - 12; // Subtract label width
+    if (rect) {
+      const clickPixel = e.clientX - rect.left;
       const clickTimestamp = pixelToTimestamp(clickPixel);
       const finalTimestamp = Math.min(Math.max(0, clickTimestamp), maxDuration);
       console.log('🖱️ Timeline clicked, seeking to:', formatTime(finalTimestamp));
@@ -406,8 +459,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
     if (isDragging || isResizing) return;
     
     const rect = timelineRef.current?.getBoundingClientRect();
-    if (rect && e.clientX >= rect.left + 12) { // Account for label offset
-      const mousePixel = e.clientX - rect.left - 12; // Subtract label width
+    if (rect) {
+      const mousePixel = e.clientX - rect.left;
       const mouseTimestamp = pixelToTimestamp(mousePixel);
       const clampedTimestamp = Math.min(Math.max(0, mouseTimestamp), maxDuration);
       setCursorPosition(clampedTimestamp);
@@ -580,8 +633,9 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
       }
 
       const channelData = audioBuffer.getChannelData(0); // Use first channel
-      // Generate more samples for better zoom detail
-      const samples = Math.min(1000, Math.max(200, timelineWidth / 2)); 
+      // Generate more samples for better zoom detail - scale with zoom level
+      const baseSamples = Math.min(2000, Math.max(400, timelineWidth / 1.5));
+      const samples = Math.floor(baseSamples * Math.max(1, zoom)); 
       const blockSize = Math.floor(channelData.length / samples);
       const waveformData: number[] = [];
 
@@ -606,7 +660,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
       console.error('Failed to generate waveform:', error);
       setAudioWaveform([]);
     }
-  }, [timelineWidth]);
+  }, [timelineWidth, zoom]);
 
   // Generate waveform when audio changes
   useEffect(() => {
@@ -624,7 +678,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
         return () => clearTimeout(timeout);
       }
     }
-  }, [show.audio, generateWaveform]);
+  }, [show.audio, generateWaveform, zoom]);
 
   // Stop restoration indicator when audio is restored
   useEffect(() => {
@@ -912,7 +966,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
         {show.audio && (
           <div 
             className="relative bg-gray-900 border-b border-gray-600"
-            style={{ height: WAVEFORM_HEIGHT, minWidth: timelineWidth }}
+            style={{ height: WAVEFORM_HEIGHT, width: timelineWidth, minWidth: timelineWidth }}
           >
             {/* Draggable Audio Container */}
             <div 
@@ -950,8 +1004,8 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
               ref={canvasRef}
               width={timelineWidth}
               height={WAVEFORM_HEIGHT}
-              className="absolute inset-0 z-10"
-              style={{ imageRendering: 'pixelated' }}
+              className="absolute left-0 top-0 z-10"
+              style={{ imageRendering: 'pixelated', width: timelineWidth, height: WAVEFORM_HEIGHT }}
             />
             
             {/* Waveform Visualization */}
@@ -959,8 +1013,9 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
               <svg
                 width={timelineWidth}
                 height={WAVEFORM_HEIGHT}
-                className="absolute inset-0 z-10"
+                className="absolute left-0 top-0 z-10"
                 viewBox={`0 0 ${timelineWidth} ${WAVEFORM_HEIGHT}`}
+                style={{ width: timelineWidth, height: WAVEFORM_HEIGHT }}
               >
                 <defs>
                   {/* Bright, high-contrast waveform gradient */}
@@ -990,10 +1045,7 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                   const timelineTimePosition = audioStartOffset + audioTimePosition;
                   const x = timestampToPixel(timelineTimePosition);
                   
-                  // Only render bars that are visible within the current zoom level
-                  if (x < 0 || x > timelineWidth) {
-                    return null;
-                  }
+                  // Let SVG handle clipping - render all bars for proper scrolling
                   
                   const centerY = WAVEFORM_HEIGHT / 2;
                   const height = Math.max(3, amplitude * (WAVEFORM_HEIGHT * 0.95)); // Use more height, minimum 3px
@@ -1067,26 +1119,27 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
             return (
               <div
                 key={index}
-                className={`absolute top-0 bottom-0 ${isMainGrid ? 'w-px bg-gray-700/60' : 'w-px bg-gray-700/30'}`}
+                className={`absolute top-0 bottom-0 ${isMainGrid ? 'w-px bg-gray-700/60' : 'w-px bg-gray-700/30'} pointer-events-none z-0`}
                 style={{ left: timestampToPixel(timestamp) }}
               />
             );
           })}
 
-          {/* Track separators and labels */}
-          <div className="absolute left-0 top-0 w-12 h-full bg-gray-800 border-r border-gray-600 z-10">
+
+          {/* Track Labels - positioned outside the interactive timeline area */}
+          <div className="absolute left-0 top-0 w-12 h-full bg-gray-800 border-r border-gray-600 z-0 pointer-events-none">
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-center h-20 border-b border-gray-600">
-                <span className="text-xs text-orange-400 font-bold transform -rotate-90">PYRO</span>
+              <div className="flex items-center justify-center" style={{ height: TRACK_HEIGHT }} >
+                <span className="text-xs text-orange-300 font-bold transform -rotate-90 whitespace-nowrap">PYRO</span>
               </div>
-              <div className="flex items-center justify-center h-20">
-                <span className="text-xs text-blue-400 font-bold transform -rotate-90">ILUME</span>
+              <div className="flex items-center justify-center" style={{ height: TRACK_HEIGHT }}>
+                <span className="text-xs text-blue-300 font-bold transform -rotate-90 whitespace-nowrap">ILLUME</span>
               </div>
             </div>
           </div>
 
-          {/* Firework Track */}
-          <div className="absolute top-0 left-12 right-0" style={{ height: TRACK_HEIGHT }}>
+          {/* Firework Track - positioned after labels to avoid overlap */}
+          <div className="absolute top-0 left-12 right-0" style={{ height: TRACK_HEIGHT, zIndex: 1 }}>
             <div className="h-full bg-orange-900/10 border-b border-gray-600">
               {/* Firework Sequences */}
               {show.sequences.filter(s => s.type === 'firework').map((sequence) => {
@@ -1096,15 +1149,15 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                 return (
                   <div
                     key={sequence.id}
-                    className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg ${
-                      isDragging === sequence.id ? 'opacity-50 scale-105' : ''
+                    className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
+                      isDragging === sequence.id ? 'opacity-50 scale-105 z-[60]' : ''
                     } ${
                       isCurrentlyPlaying 
-                        ? 'bg-orange-400 border-orange-300 shadow-orange-500/50 scale-110 z-30 animate-pulse' 
+                        ? 'bg-orange-400 border-orange-300 shadow-orange-500/50 scale-110 z-[55] animate-pulse' 
                         : 'bg-orange-500 hover:bg-orange-400 border-orange-400 hover:shadow-orange-500/30'
                     }`}
                     style={{
-                      left: timestampToPixel(sequence.timestamp) - 12,
+                      left: timestampToPixel(sequence.timestamp),
                       width: Math.max(MIN_SEQUENCE_WIDTH, timestampToPixel(sequence.fireworkType?.duration || 1000))
                     }}
                     onMouseDown={(e) => handleMouseDown(e, sequence.id)}
@@ -1156,9 +1209,9 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
             </div>
           </div>
 
-          {/* Lighting Track */}
-          <div className="absolute bottom-0 left-12 right-0" style={{ height: TRACK_HEIGHT }}>
-            <div className="h-full bg-blue-900/10">
+          {/* Lighting Track - positioned after labels to avoid overlap */}
+          <div className="absolute bottom-0 left-12 right-0" style={{ height: TRACK_HEIGHT, zIndex: 1 }}>
+            <div className="h-full bg-blue-900/10 border-b border-gray-600">
               {/* Lighting Sequences */}
               {show.sequences.filter(s => s.type === 'lighting').map((sequence) => {
                 const isCurrentlyPlaying = isPlaying && currentTime >= sequence.timestamp && 
@@ -1169,15 +1222,15 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                 return (
                   <div
                     key={sequence.id}
-                    className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg ${
-                      isDragging === sequence.id ? 'opacity-50 scale-105' : ''
+                    className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
+                      isDragging === sequence.id ? 'opacity-50 scale-105 z-[60]' : ''
                     } ${
                       isCurrentlyPlaying 
-                        ? 'bg-blue-400 border-blue-300 shadow-blue-500/50 scale-110 z-30 animate-pulse' 
+                        ? 'bg-blue-400 border-blue-300 shadow-blue-500/50 scale-110 z-[55] animate-pulse' 
                         : 'bg-blue-500 hover:bg-blue-400 border-blue-400 hover:shadow-blue-500/30'
                     }`}
                     style={{
-                      left: timestampToPixel(sequence.timestamp) - 12,
+                      left: timestampToPixel(sequence.timestamp),
                       width: Math.max(MIN_SEQUENCE_WIDTH, timestampToPixel(sequenceDuration))
                     }}
                     onMouseDown={(e) => handleMouseDown(e, sequence.id)}
@@ -1235,41 +1288,41 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
             </div>
           </div>
 
-          {/* Cursor position indicator (preview) - more precise */}
-          {!isPlaying && Math.abs(cursorPosition - currentTime) > 100 && (
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-yellow-400 z-30 opacity-90"
-              style={{ left: timestampToPixel(cursorPosition) }}
-            >
-              <div className="absolute -top-1 -left-1 w-3 h-2 bg-yellow-400 rounded-b-sm opacity-90" />
-              {/* Precise time indicator */}
-              <div className="absolute -top-6 -left-8 bg-yellow-400 text-black text-xs px-1 rounded text-center font-mono">
-                {formatTime(cursorPosition)}
+              {/* Cursor position indicator (preview) - more precise */}
+              {!isPlaying && Math.abs(cursorPosition - currentTime) > 100 && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-yellow-400 z-30 opacity-90 pointer-events-none"
+                  style={{ left: timestampToPixel(cursorPosition) }}
+                >
+                  <div className="absolute -top-1 -left-1 w-3 h-2 bg-yellow-400 rounded-b-sm opacity-90" />
+                  {/* Precise time indicator */}
+                  <div className="absolute -top-6 -left-8 bg-yellow-400 text-black text-xs px-1 rounded text-center font-mono">
+                    {formatTime(cursorPosition)}
+                  </div>
+                </div>
+              )}
+
+              {/* Current time playhead - more precise */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-40 shadow-lg pointer-events-none"
+                style={{ left: timestampToPixel(currentTime) }}
+              >
+                <div className="absolute -top-2 -left-2 w-5 h-4 bg-red-500 rounded-b-lg border border-red-400" />
+                {/* Current time display */}
+                <div className="absolute -top-8 -left-8 bg-red-500 text-white text-xs px-1 rounded text-center font-mono">
+                  {formatTime(currentTime)}
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Current time playhead - more precise */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-40 shadow-lg"
-            style={{ left: timestampToPixel(currentTime) + 12 }}
-          >
-            <div className="absolute -top-2 -left-2 w-5 h-4 bg-red-500 rounded-b-lg border border-red-400" />
-            {/* Current time display */}
-            <div className="absolute -top-8 -left-8 bg-red-500 text-white text-xs px-1 rounded text-center font-mono">
-              {formatTime(currentTime)}
-            </div>
-          </div>
-
-          {/* Playback progress overlay */}
-          {isPlaying && (
-            <div
-              className="absolute top-0 bottom-0 bg-red-500/5 z-20 pointer-events-none"
-              style={{ 
-                left: 48,
-                width: timestampToPixel(currentTime) 
-              }}
-            />
+              {/* Playback progress overlay */}
+              {isPlaying && (
+                <div
+                  className="absolute top-0 bottom-0 bg-red-500/5 z-5 pointer-events-none"
+                  style={{ 
+                    left: 0,
+                    width: timestampToPixel(currentTime) 
+                  }}
+                />
           )}
         </div>
       </div>

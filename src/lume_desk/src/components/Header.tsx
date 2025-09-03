@@ -1,7 +1,8 @@
-import React from 'react';
-import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 import { getAppVersion } from '../utils/version';
+import { AboutModal } from './AboutModal';
 
 interface HeaderProps {
   currentView: 'dashboard' | 'firework-types' | 'lighting-effects' | 'show-builder';
@@ -11,7 +12,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => {
   const { 
     controllers, 
-    activeController, 
     connectionStatus, 
     isPlaying,
     systemArmed,
@@ -19,9 +19,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
     scanForControllers 
   } = useLumeStore();
 
-  const [iconError, setIconError] = React.useState(false);
+  const [iconError, setIconError] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
-  const activeControllerData = controllers.find(c => c.id === activeController);
   const connectedCount = controllers.filter(c => c.status === 'connected').length;
 
   const getConnectionIcon = () => {
@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
     <header className="bg-lume-dark border-b border-gray-700 px-6 py-4 relative">
       <div className="flex items-center justify-between">
         {/* Logo and Title */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             {/* App Icon with fallback */}
             {!iconError ? (
@@ -60,10 +60,22 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
             ) : (
               <Zap className="w-8 h-8 text-lume-primary" />
             )}
-            <h1 className="text-2xl font-bold text-lume-primary">LUME</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-lume-primary">LUME</h1>
+              <div className="text-xs text-gray-500 -mt-1">Professional Control System</div>
+            </div>
           </div>
-          <div className="text-sm text-gray-400">
-            v{getAppVersion()}
+          
+          {/* Version and About */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowAbout(true)}
+              className="flex items-center space-x-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+              title="About LUME - Click for version info and updates"
+            >
+              <span className="font-mono">v{getAppVersion()}</span>
+              <Info className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
@@ -115,36 +127,23 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
           </button>
         </nav>
 
-        {/* Connection Status */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+        {/* Status Indicators */}
+        <div className="flex items-center space-x-3">
+          {/* Connection Status */}
+          <div className="flex items-center space-x-2 px-3 py-2 bg-gray-700 rounded-lg">
             {getConnectionIcon()}
             <span className="text-sm text-gray-300">
-              {connectionStatus === 'connected' && (
-                `${connectedCount} controller${connectedCount !== 1 ? 's' : ''} connected`
-              )}
+              {connectionStatus === 'connected' && `${connectedCount} connected`}
               {connectionStatus === 'scanning' && 'Scanning...'}
-              {connectionStatus === 'disconnected' && 'No controllers found'}
+              {connectionStatus === 'disconnected' && 'No controllers'}
             </span>
           </div>
 
-          {/* Active Controller */}
-          {activeControllerData && (
-            <div className="flex items-center space-x-2 px-3 py-1 bg-lume-secondary rounded-lg">
-              <div className={`w-2 h-2 rounded-full ${
-                activeControllerData.status === 'connected' ? 'bg-green-500' : 'bg-red-500'
-              }`} />
-              <span className="text-sm text-white font-medium">
-                {activeControllerData.name}
-              </span>
-            </div>
-          )}
-
           {/* Show Status */}
           {isPlaying && (
-            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-600 rounded-lg">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-blue-600 rounded-lg">
               <Power className="w-4 h-4 text-white" />
-              <span className="text-sm text-white font-medium">Show Playing</span>
+              <span className="text-sm text-white font-medium">Playing</span>
             </div>
           )}
         </div>
@@ -154,63 +153,46 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
           <button
             onClick={scanForControllers}
             disabled={connectionStatus === 'scanning'}
-            className="px-4 py-2 bg-lume-secondary hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {connectionStatus === 'scanning' ? 'Scanning...' : 'Scan'}
           </button>
 
-          {/* ARMED/DISARMED System Toggle */}
-          <div className="relative">
-            <button
-              onClick={handleToggleArmed}
-              className={`px-8 py-3 rounded-xl font-bold text-lg transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 active:scale-95 ${
-                systemArmed 
-                  ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-xl shadow-red-500/30 ring-2 ring-red-400/20' 
-                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-xl shadow-green-500/30 ring-2 ring-green-400/20'
-              }`}
-              title={systemArmed ? 'Click to DISARM system (disable firework firing)' : 'Click to ARM system (enable firework firing)'}
-            >
-              <div className={`w-3 h-3 rounded-full animate-pulse ${
-                systemArmed ? 'bg-red-200' : 'bg-green-200'
-              }`} />
-              {systemArmed ? (
-                <>
-                  <ShieldAlert className="w-6 h-6" />
-                  <span className="tracking-wide">ARMED</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-6 h-6" />
-                  <span className="tracking-wide">DISARMED</span>
-                </>
-              )}
-            </button>
-            
-            {/* Status indicator */}
-            <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full animate-pulse ${
-              systemArmed ? 'bg-red-400' : 'bg-green-400'
+          {/* ARMED/DISARMED System Toggle - Compact */}
+          <button
+            onClick={handleToggleArmed}
+            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 flex items-center space-x-2 ${
+              systemArmed 
+                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20' 
+                : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20'
+            }`}
+            title={systemArmed ? 'ARMED: Click to DISARM system' : 'DISARMED: Click to ARM system'}
+          >
+            <div className={`w-2 h-2 rounded-full ${
+              systemArmed ? 'bg-red-200 animate-pulse' : 'bg-green-200'
             }`} />
-          </div>
+            {systemArmed ? (
+              <>
+                <ShieldAlert className="w-4 h-4" />
+                <span>ARMED</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4" />
+                <span>SAFE</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
       
-      {/* Sleek Status Bar */}
-      <div className={`absolute bottom-0 left-0 right-0 h-1 transition-all duration-300 ${
-        systemArmed 
-          ? 'bg-gradient-to-r from-red-600 via-red-500 to-red-600 shadow-lg shadow-red-500/50' 
-          : 'bg-gradient-to-r from-green-600 via-green-500 to-green-600 shadow-lg shadow-green-500/50'
-      }`}>
-        <div className={`h-full w-full relative overflow-hidden ${
-          systemArmed ? 'bg-red-400/20' : 'bg-green-400/20'
-        }`}>
-          {/* Animated flowing effect */}
-          <div className={`absolute inset-0 animate-pulse opacity-60 ${
-            systemArmed 
-              ? 'bg-gradient-to-r from-transparent via-red-300/30 to-transparent'
-              : 'bg-gradient-to-r from-transparent via-green-300/30 to-transparent'
-          } transform -skew-x-12`} />
-        </div>
-      </div>
+      {/* Simplified Status Bar */}
+      <div className={`absolute bottom-0 left-0 right-0 h-0.5 transition-colors duration-300 ${
+        systemArmed ? 'bg-red-500' : 'bg-green-500'
+      }`} />
+      
+      {/* About Modal */}
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </header>
   );
 };
