@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Play, Pause, Settings, Clock, Lightbulb, Zap, Download, Upload, AlertCircle } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
-import { VersionService } from '../services/version-service';
 import type { ShowSequence, FireworkType, LightingEffectType, ShowFile } from '../types';
 import { EnhancedShowTimeline } from './EnhancedShowTimeline';
 
@@ -181,28 +180,27 @@ const CompactLightingCard: React.FC<{ lightingEffect: LightingEffectType }> = ({
 
 export const ShowBuilder: React.FC = () => {
   const { 
-    controllers,
-    fireworkTypes, 
-    lightingEffectTypes,
+    controllers, 
     currentShow, 
-    createShow, 
+    fireworkTypes, 
+    lightingEffectTypes, 
+    isPlaying, 
+    isOfflineMode,
+    currentPlaybackTime,
     addShowSequence, 
     removeShowSequence,
     updateShowSequence,
-    isPlaying,
-    playShow,
-    stopShow,
-    currentPlaybackTime,
+    playShow, 
+    stopShow, 
+    createShow,
+    importShow,
     setShowAudio,
     removeShowAudio,
     moveShowAudio,
     moveSequence,
     seekTo,
-    restoreShowAudio,
-    importShow
-  } = useLumeStore();
-
-  // File input ref for import
+    restoreShowAudio
+  } = useLumeStore();  // File input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Import/Export handlers
@@ -271,17 +269,27 @@ export const ShowBuilder: React.FC = () => {
     if (!file) return;
 
     try {
+      console.log('📁 File selected for import:', file.name);
       const content = await file.text();
       const showFile: ShowFile = JSON.parse(content);
       
+      console.log('📋 Parsed show file:', {
+        format: showFile.format,
+        version: showFile.version,
+        showName: showFile.show?.name,
+        metadata: showFile.metadata
+      });
+      
       const success = await importShow(showFile);
       if (success) {
+        console.log('✅ Import completed successfully in UI');
         alert('Show imported successfully!');
       } else {
+        console.error('❌ Import failed in store');
         alert('Failed to import show. Please check the file format.');
       }
     } catch (error) {
-      console.error('Import failed:', error);
+      console.error('💥 Import failed with error:', error);
       alert('Failed to import show. Please check the file format.');
     }
     
@@ -306,6 +314,17 @@ export const ShowBuilder: React.FC = () => {
     }
   }, [currentShow?.id, currentShow?.audio, restoreShowAudio]);
 
+  // Debug: Track when currentShow changes
+  useEffect(() => {
+    console.log('🔄 ShowBuilder: currentShow changed:', {
+      hasShow: !!currentShow,
+      showId: currentShow?.id,
+      showName: currentShow?.name,
+      sequenceCount: currentShow?.sequences?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  }, [currentShow]);
+
   const [showName, setShowName] = useState('New Show');
   const [showDescription, setShowDescription] = useState('');
   const [selectedFireworkType, setSelectedFireworkType] = useState<FireworkType | null>(null);
@@ -313,6 +332,17 @@ export const ShowBuilder: React.FC = () => {
   const [effectTab, setEffectTab] = useState<'fireworks' | 'lighting'>('fireworks');
   const [sequenceTime, setSequenceTime] = useState(0);
   const [selectedController, setSelectedController] = useState('');
+
+  // Sync local showName state with currentShow.name when show is imported
+  useEffect(() => {
+    if (currentShow?.name && currentShow.name !== showName) {
+      console.log('🔄 Syncing local showName state with imported show:', {
+        oldName: showName,
+        newName: currentShow.name
+      });
+      setShowName(currentShow.name);
+    }
+  }, [currentShow?.name, showName]);
   
   // Auto-select appropriate controller when switching effect types
   useEffect(() => {
@@ -450,7 +480,7 @@ export const ShowBuilder: React.FC = () => {
     });
 
     // Check if offline mode is enabled
-    const isOfflineMode = VersionService.isOfflineModeEnabled();
+    // Using isOfflineMode from store instead of VersionService
     console.log('🌐 Offline mode enabled:', isOfflineMode);
 
     if (effectTab === 'fireworks') {
@@ -542,7 +572,7 @@ export const ShowBuilder: React.FC = () => {
   };
 
   // Check if offline mode is enabled for UI display
-  const isOfflineMode = VersionService.isOfflineModeEnabled();
+  // Using isOfflineMode from store instead of VersionService
   const hasConnectedControllers = controllers.some(c => c.status === 'connected');
 
   return (

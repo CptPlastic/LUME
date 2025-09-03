@@ -12,7 +12,7 @@ import { useLumeStore } from './store/lume-store';
 type ViewType = 'dashboard' | 'firework-types' | 'lighting-effects' | 'show-builder';
 
 function App() {
-  console.log('🚀 App component rendering - Full LUME App');
+  console.debug('🚀 App component rendering - Full LUME App');
   
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isInitialized, setIsInitialized] = useState(false);

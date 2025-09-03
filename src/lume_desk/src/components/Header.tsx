@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
+import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, ShieldAlert, ShieldCheck, Info, FileText } from 'lucide-react';
 import { useLumeStore } from '../store/lume-store';
 import { getAppVersion } from '../utils/version';
 import { AboutModal } from './AboutModal';
+import { LogViewer } from './LogViewer';
 
 interface HeaderProps {
   currentView: 'dashboard' | 'firework-types' | 'lighting-effects' | 'show-builder';
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
 
   const [iconError, setIconError] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showLogViewer, setShowLogViewer] = useState(false);
 
   const connectedCount = controllers.filter(c => c.status === 'connected').length;
 
@@ -75,6 +77,14 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
             >
               <span className="font-mono">v{getAppVersion()}</span>
               <Info className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => setShowLogViewer(true)}
+              className="flex items-center space-x-1 px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+              title="View captured console logs"
+            >
+              <FileText className="w-3 h-3" />
+              <span>Logs</span>
             </button>
           </div>
         </div>
@@ -193,6 +203,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onViewChange }) => 
       
       {/* About Modal */}
       <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
+      
+      {/* Log Viewer */}
+      <LogViewer isOpen={showLogViewer} onClose={() => setShowLogViewer(false)} />
     </header>
   );
 };

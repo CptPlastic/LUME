@@ -10,6 +10,7 @@ import {
   Settings
 } from 'lucide-react';
 import { VersionService } from '../services/version-service';
+import { useLumeStore } from '../store/lume-store';
 
 interface UpdateNotificationProps {
   onDismiss?: () => void;
@@ -30,12 +31,13 @@ interface UpdateStatus {
 }
 
 export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismiss }) => {
+  const { isOfflineMode, toggleOfflineMode } = useLumeStore();
+  
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [networkMode, setNetworkMode] = useState<'online' | 'lume' | 'offline'>('offline');
   const [isChecking, setIsChecking] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [offlineMode, setOfflineMode] = useState(VersionService.isOfflineModeEnabled());
 
   // Check network mode and updates on component mount
   useEffect(() => {
@@ -81,13 +83,8 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
   };
 
   const handleToggleOfflineMode = () => {
-    const newOfflineMode = !offlineMode;
-    if (newOfflineMode) {
-      VersionService.enableOfflineMode();
-    } else {
-      VersionService.disableOfflineMode();
-    }
-    setOfflineMode(newOfflineMode);
+    console.log('🔄 Toggling offline mode from UpdateNotification');
+    toggleOfflineMode();
   };
 
   const handleDismiss = () => {
@@ -124,7 +121,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
       case 'lume':
         return 'Connected to LUME controllers - show building enabled';
       case 'offline':
-        return offlineMode ? 'Offline mode - show building enabled' : 'Offline - show building limited';
+        return isOfflineMode ? 'Offline mode - show building enabled' : 'Offline - show building limited';
     }
   };
 
@@ -145,14 +142,14 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
           <div className="flex items-center space-x-2">
             {networkMode === 'offline' && (
               <button
-                onClick={handleToggleOfflineMode}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  offlineMode
-                    ? 'bg-lume-primary text-white'
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isOfflineMode
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'bg-gray-600 hover:bg-gray-700 text-gray-200'
                 }`}
+                onClick={handleToggleOfflineMode}
               >
-                {offlineMode ? 'Offline Mode ON' : 'Enable Offline Mode'}
+                {isOfflineMode ? 'Offline Mode ON' : 'Enable Offline Mode'}
               </button>
             )}
             
@@ -178,7 +175,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
               <div className="text-xs text-gray-300">
                 <p className="font-medium">Offline Mode:</p>
                 <p>
-                  {offlineMode 
+                  {isOfflineMode 
                     ? 'Build shows without controller validation. Shows can be saved and exported for later use when controllers are available.'
                     : 'Show building requires connected controllers. Enable offline mode to build shows without validation.'
                   }

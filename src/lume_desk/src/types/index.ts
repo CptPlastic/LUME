@@ -280,6 +280,11 @@ export interface LumeStore {
   toggleSystemArmed: () => void;
   setSystemArmed: (armed: boolean) => void;
   
+  // Offline mode management
+  isOfflineMode: boolean;
+  toggleOfflineMode: () => void;
+  setOfflineMode: (enabled: boolean) => void;
+  
   // Enhanced Import/Export with async support
   exportShow: (showId: string) => Promise<ShowFile>;
   importShow: (showFile: ShowFile) => Promise<boolean>;

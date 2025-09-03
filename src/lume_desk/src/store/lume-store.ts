@@ -66,6 +66,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
         isPlaying: false,
         connectionStatus: 'disconnected',
         systemArmed: false, // Default to DISARMED for safety
+        isOfflineMode: false, // Will be initialized from localStorage
         apis: new Map(),
         lastScanTime: null,
         showTimeouts: [],
@@ -578,6 +579,34 @@ export const useLumeStore = create<LumeStoreImpl>()(
           set(() => ({ systemArmed: armed }));
         },
 
+        // Offline mode management
+        toggleOfflineMode: () => {
+          const { isOfflineMode } = get();
+          const newOfflineMode = !isOfflineMode;
+          
+          if (newOfflineMode) {
+            console.log('🔧 Enabling offline mode - show building without controller validation');
+            localStorage.setItem('lume-offline-mode', 'true');
+          } else {
+            console.log('🔧 Disabling offline mode - normal operation');
+            localStorage.removeItem('lume-offline-mode');
+          }
+          
+          set({ isOfflineMode: newOfflineMode });
+        },
+
+        setOfflineMode: (enabled: boolean) => {
+          if (enabled) {
+            console.log('🔧 Setting offline mode to enabled');
+            localStorage.setItem('lume-offline-mode', 'true');
+          } else {
+            console.log('🔧 Setting offline mode to disabled');
+            localStorage.removeItem('lume-offline-mode');
+          }
+          
+          set({ isOfflineMode: enabled });
+        },
+
         // Enhanced Import/Export with audio support
         exportShow: async (showId: string): Promise<ShowFile> => {
           const { currentShow, fireworkTypes, lightingEffectTypes, controllers } = get();
@@ -593,19 +622,47 @@ export const useLumeStore = create<LumeStoreImpl>()(
 
         importShow: async (showFile: ShowFile): Promise<boolean> => {
           try {
+            console.log('📥 Starting show import process...');
+            console.log('📋 Import file metadata:', {
+              format: showFile.format,
+              version: showFile.version,
+              showName: showFile.show?.name,
+              showId: showFile.show?.id,
+              sequenceCount: showFile.show?.sequences?.length || 0,
+              hasAudio: !!showFile.audioData
+            });
+            
             const result = await ShowService.importShow(showFile);
             if (result.success && result.show) {
+              console.log('✅ Show service import successful');
+              console.log('📋 Imported show details:', {
+                id: result.show.id,
+                name: result.show.name,
+                sequenceCount: result.show.sequences.length,
+                hasAudio: !!result.show.audio
+              });
               
               // Backup current show if one exists
               const { currentShow } = get();
               if (currentShow) {
+                console.log('💾 Backing up current show before import');
                 await ShowService.createShowBackup(currentShow);
               }
 
+              console.log('🔄 Setting imported show as current show');
               set({ currentShow: result.show });
+              
+              // Verify the show was set correctly
+              const { currentShow: newCurrentShow } = get();
+              console.log('🔍 Verification - Current show after import:', {
+                id: newCurrentShow?.id,
+                name: newCurrentShow?.name,
+                sequenceCount: newCurrentShow?.sequences?.length || 0
+              });
               
               // Add imported firework types
               if (result.fireworkTypes) {
+                console.log(`🎆 Adding ${result.fireworkTypes.length} imported firework types`);
                 result.fireworkTypes.forEach(ft => {
                   get().addFireworkType(ft);
                 });
@@ -613,6 +670,7 @@ export const useLumeStore = create<LumeStoreImpl>()(
               
               // Add imported lighting effect types
               if (result.lightingEffectTypes) {
+                console.log(`💡 Adding ${result.lightingEffectTypes.length} imported lighting effect types`);
                 result.lightingEffectTypes.forEach(lt => {
                   get().addLightingEffectType(lt);
                 });
@@ -1194,3 +1252,13 @@ export const useLumeStore = create<LumeStoreImpl>()(
     }
   )
 );
+
+// Initialize offline mode from localStorage
+const initializeOfflineMode = () => {
+  const isOfflineMode = localStorage.getItem('lume-offline-mode') === 'true';
+  useLumeStore.getState().setOfflineMode(isOfflineMode);
+  console.log('🔧 Initialized offline mode from localStorage:', isOfflineMode);
+};
+
+// Initialize on store creation
+initializeOfflineMode();
