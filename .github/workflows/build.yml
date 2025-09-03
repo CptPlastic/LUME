@@ -1,4 +1,4 @@
-name: 'Build Test Scan'
+name: 'Build Test'
 
 on:
   push:
@@ -96,16 +96,3 @@ jobs:
           path: |
             src/lume_desk/src-tauri/target/debug/bundle/
           retention-days: 7
-
-  sonarqube:
-    name: SonarQube Scan
-    needs: [test-frontend, test-tauri]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
