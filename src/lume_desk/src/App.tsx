@@ -69,7 +69,7 @@ function App() {
     };
 
     initializeApp();
-  }, [restoreShowAudio, currentShow]);
+  }, [restoreShowAudio, currentShow, startStatusRefresh]);
   
   // Cleanup status refresh on unmount
   useEffect(() => {

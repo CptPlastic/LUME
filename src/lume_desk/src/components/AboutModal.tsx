@@ -8,9 +8,19 @@ interface AboutModalProps {
   onClose: () => void;
 }
 
+interface UpdateStatus {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  error?: string;
+  versionInfo?: {
+    downloadUrl?: string;
+  };
+}
+
 export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
   const versionInfo = getVersionInfo();
-  const [updateStatus, setUpdateStatus] = useState<any>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [networkMode, setNetworkMode] = useState<string>('unknown');
 
@@ -28,7 +38,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
     try {
       const status = await VersionService.checkForUpdates();
       setUpdateStatus(status);
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
       setUpdateStatus({
         hasUpdate: false,
         currentVersion: versionInfo.app,
@@ -166,7 +177,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             
             {updateStatus && (
               <div className="space-y-2">
-                {updateStatus.hasUpdate ? (
+                {updateStatus.hasUpdate && (
                   <div className="p-3 bg-green-900/20 border border-green-500/30 rounded">
                     <div className="flex items-center space-x-2 mb-2">
                       <Download className="w-4 h-4 text-green-500" />
@@ -185,14 +196,18 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                       </button>
                     )}
                   </div>
-                ) : updateStatus.error ? (
+                )}
+                
+                {!updateStatus.hasUpdate && updateStatus.error && (
                   <div className="p-3 bg-red-900/20 border border-red-500/30 rounded">
                     <div className="flex items-center space-x-2">
                       <AlertCircle className="w-4 h-4 text-red-500" />
                       <span className="text-red-300 text-sm">{updateStatus.error}</span>
                     </div>
                   </div>
-                ) : (
+                )}
+                
+                {!updateStatus.hasUpdate && !updateStatus.error && (
                   <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded">
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="w-4 h-4 text-blue-500" />
