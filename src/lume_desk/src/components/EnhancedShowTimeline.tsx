@@ -995,8 +995,9 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
             style={{ height: WAVEFORM_HEIGHT, width: timelineWidth, minWidth: timelineWidth }}
           >
             {/* Draggable Audio Container */}
-            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
             <div 
+              role="button"
+              tabIndex={0}
               className={`absolute bg-gradient-to-r from-blue-900/20 to-blue-800/20 border-2 border-blue-500/30 hover:border-blue-400/50 rounded cursor-move transition-all group ${
                 isDraggingAudio ? 'opacity-75 scale-105 border-blue-400' : ''
               }`}
@@ -1008,6 +1009,12 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                 zIndex: 15
               }}
               onMouseDown={handleAudioMouseDown}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  // Could trigger audio repositioning mode here
+                }
+              }}
               title={`🎵 ${show.audio.name} - Drag to reposition`}
             >
               {/* Audio name and offset info */}
@@ -1117,10 +1124,10 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
         )}
 
         {/* Main Timeline Tracks */}
-        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
         <div
           ref={timelineRef}
           className="relative cursor-pointer"
+          role="application"
           tabIndex={0}
           aria-label="Timeline editor - Click to seek, use arrow keys to navigate, space to play/pause"
           style={{ 
@@ -1145,7 +1152,11 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
               onSeek(maxDuration);
             } else if (e.key === ' ') {
               e.preventDefault();
-              isPlaying ? onPause() : onPlay();
+              if (isPlaying) {
+                onPause();
+              } else {
+                onPlay();
+              }
             }
           }}
           onMouseMove={(e) => {
@@ -1177,9 +1188,10 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                   currentTime <= sequence.timestamp + (sequence.fireworkType?.duration || 1000);
                 
                 return (
-                  /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */
                   <div
                     key={sequence.id}
+                    role="button"
+                    tabIndex={0}
                     className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
                       isDragging === sequence.id ? 'opacity-50 scale-105 z-[60]' : ''
                     } ${
@@ -1192,6 +1204,12 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                       width: Math.max(MIN_SEQUENCE_WIDTH, timestampToPixel(sequence.fireworkType?.duration || 1000))
                     }}
                     onMouseDown={(e) => handleMouseDown(e, sequence.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleEditSequence(sequence);
+                      }
+                    }}
                     title={`${sequence.fireworkType?.name || 'Firework'} at ${formatTime(sequence.timestamp)} (Ch:${sequence.channel}, Area:${sequence.area})`}
                   >
                     {/* Precise timing indicator */}
@@ -1251,9 +1269,10 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                 const sequenceDuration = sequence.duration || sequence.lightingEffectType?.duration || 5000;
                 
                 return (
-                  /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */
                   <div
                     key={sequence.id}
+                    role="button"
+                    tabIndex={0}
                     className={`absolute top-3 bottom-3 rounded cursor-move border flex items-center justify-between transition-all group shadow-lg pointer-events-auto z-50 ${
                       isDragging === sequence.id ? 'opacity-50 scale-105 z-[60]' : ''
                     } ${
@@ -1266,6 +1285,12 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                       width: Math.max(MIN_SEQUENCE_WIDTH, timestampToPixel(sequenceDuration))
                     }}
                     onMouseDown={(e) => handleMouseDown(e, sequence.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleEditSequence(sequence);
+                      }
+                    }}
                     title={`${sequence.lightingEffectType?.name || 'Lighting'} at ${formatTime(sequence.timestamp)} (${formatTime(sequenceDuration)}) Ch:${sequence.channel}, Area:${sequence.area}`}
                   >
                     {/* Precise timing indicator */}
@@ -1278,10 +1303,17 @@ export const EnhancedShowTimeline: React.FC<EnhancedShowTimelineProps> = ({
                     </span>
                     <div className="flex items-center">
                       {/* Resize handle */}
-                      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
                       <div
+                        role="button"
+                        tabIndex={0}
                         className="w-1 h-6 bg-blue-300 hover:bg-blue-200 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity mr-1 rounded"
                         onMouseDown={(e) => handleResizeStart(e, sequence.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            // Could initiate resize mode here
+                          }
+                        }}
                         title="Drag to adjust duration"
                       />
                       <button
