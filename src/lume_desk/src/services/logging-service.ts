@@ -3,7 +3,7 @@ export interface LogEntry {
   timestamp: Date;
   level: 'log' | 'error' | 'warn' | 'info' | 'debug';
   message: string;
-  args: any[];
+  args: unknown[];
   source?: string;
   stack?: string;
 }
@@ -23,11 +23,11 @@ class LoggingService {
   private maxLogEntries = 10000; // Prevent memory overflow
   private listeners: ((logs: LogEntry[]) => void)[] = [];
   private originalConsole: {
-    log: (...args: any[]) => void;
-    error: (...args: any[]) => void;
-    warn: (...args: any[]) => void;
-    info: (...args: any[]) => void;
-    debug: (...args: any[]) => void;
+    log: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
+    warn: (...args: unknown[]) => void;
+    info: (...args: unknown[]) => void;
+    debug: (...args: unknown[]) => void;
   };
 
   constructor() {
@@ -45,33 +45,33 @@ class LoggingService {
 
   private interceptConsole() {
     // Override console methods to capture logs
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       this.addLog('log', this.formatMessage(args), args);
       this.originalConsole.log(...args);
     };
 
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       this.addLog('error', this.formatMessage(args), args);
       this.originalConsole.error(...args);
     };
 
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       this.addLog('warn', this.formatMessage(args), args);
       this.originalConsole.warn(...args);
     };
 
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       this.addLog('info', this.formatMessage(args), args);
       this.originalConsole.info(...args);
     };
 
-    console.debug = (...args: any[]) => {
+    console.debug = (...args: unknown[]) => {
       this.addLog('debug', this.formatMessage(args), args);
       this.originalConsole.debug(...args);
     };
   }
 
-  private formatMessage(args: any[]): string {
+  private formatMessage(args: unknown[]): string {
     return args.map(arg => {
       if (typeof arg === 'string') return arg;
       if (typeof arg === 'object') {
@@ -85,7 +85,7 @@ class LoggingService {
     }).join(' ');
   }
 
-  private addLog(level: LogEntry['level'], message: string, args: any[]) {
+  private addLog(level: LogEntry['level'], message: string, args: unknown[]) {
     const entry: LogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date(),
@@ -196,7 +196,7 @@ class LoggingService {
       case 'json':
         return JSON.stringify(this.logs, null, 2);
       
-      case 'csv':
+      case 'csv': {
         const headers = ['Timestamp', 'Level', 'Source', 'Message'];
         const rows = this.logs.map(log => [
           log.timestamp.toISOString(),
@@ -205,6 +205,7 @@ class LoggingService {
           `"${log.message.replace(/"/g, '""')}"`
         ]);
         return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      }
       
       case 'txt':
         return this.logs.map(log => 

@@ -3,7 +3,7 @@ import { Zap, Wifi, WifiOff, Power, Wrench, Sparkles, Lightbulb, Clapperboard, S
 import { useLumeStore } from '../store/lume-store';
 import { getAppVersion } from '../utils/version';
 import { AboutModal } from './AboutModal';
-import { LogViewer } from './LogViewer';
+import LogViewer from './LogViewer';
 
 interface HeaderProps {
   currentView: 'dashboard' | 'firework-types' | 'lighting-effects' | 'show-builder';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { X, Download, Trash2, Search, Filter, CheckCircle, AlertCircle, Info, Zap, Bug } from 'lucide-react';
 import type { LogEntry, LogFilter } from '../services/logging-service';
 import { loggingService } from '../services/logging-service';
 
@@ -7,7 +8,7 @@ interface LogViewerProps {
   onClose: () => void;
 }
 
-export const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
+const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedLevels, setSelectedLevels] = useState<Set<LogEntry['level']>>(
@@ -81,175 +82,220 @@ export const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
 
   const getLevelBadgeColor = (level: LogEntry['level']) => {
     switch (level) {
-      case 'error': return 'bg-red-100 text-red-800';
-      case 'warn': return 'bg-yellow-100 text-yellow-800';
-      case 'info': return 'bg-blue-100 text-blue-800';
-      case 'debug': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-green-100 text-green-800';
+      case 'error': return 'bg-red-500 text-white';
+      case 'warn': return 'bg-yellow-500 text-black';
+      case 'info': return 'bg-blue-500 text-white';
+      case 'debug': return 'bg-gray-500 text-white';
+      default: return 'bg-green-500 text-white';
+    }
+  };
+
+  const getLevelIcon = (level: LogEntry['level']) => {
+    switch (level) {
+      case 'error': return <AlertCircle className="w-4 h-4" />;
+      case 'warn': return <AlertCircle className="w-4 h-4" />;
+      case 'info': return <Info className="w-4 h-4" />;
+      case 'debug': return <Bug className="w-4 h-4" />;
+      default: return <CheckCircle className="w-4 h-4" />;
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg shadow-lg w-full h-full max-w-6xl max-h-[90vh] flex flex-col border border-gray-700">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg w-full max-w-6xl h-5/6 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-semibold text-white">Log Viewer</h2>
-            <div className="text-sm text-gray-400">
-              {filteredLogs.length} of {stats.total} logs
-            </div>
+          <div className="flex items-center space-x-2">
+            <Zap className="w-5 h-5 text-orange-500" />
+            <h2 className="text-xl font-bold text-white">System Logs</h2>
+            <span className="text-sm text-gray-400">
+              ({logs.length} total, {filteredLogs.length} shown)
+            </span>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white"
+            className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Controls */}
-        <div className="p-4 border-b border-gray-700 bg-gray-800 space-y-4">
-          {/* Search and Actions */}
-          <div className="flex items-center space-x-4">
+        <div className="p-4 border-b border-gray-700 space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search logs..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white placeholder-gray-400"
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400"
             />
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-              />
-              <span className="text-sm text-gray-300">Auto-scroll</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={showStackTrace}
-                onChange={(e) => setShowStackTrace(e.target.checked)}
-              />
-              <span className="text-sm text-gray-300">Stack traces</span>
-            </label>
           </div>
 
           {/* Level Filters */}
           <div className="flex items-center space-x-4">
-            <span className="text-sm font-medium text-gray-300">Levels:</span>
-            {(['log', 'error', 'warn', 'info', 'debug'] as const).map(level => (
-              <label key={level} className="flex items-center space-x-1">
-                <input
-                  type="checkbox"
-                  checked={selectedLevels.has(level)}
-                  onChange={() => handleLevelToggle(level)}
-                />
-                <span className={`text-sm px-2 py-1 rounded ${getLevelBadgeColor(level)}`}>
-                  {level} ({stats.byLevel[level]})
-                </span>
-              </label>
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-400">Levels:</span>
+            </div>
+            {(['error', 'warn', 'info', 'log', 'debug'] as const).map((level) => (
+              <button
+                key={level}
+                onClick={() => handleLevelToggle(level)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  selectedLevels.has(level)
+                    ? getLevelBadgeColor(level)
+                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                }`}
+              >
+                <div className="flex items-center space-x-1">
+                  {getLevelIcon(level)}
+                  <span>{level.toUpperCase()}</span>
+                  <span className="bg-black bg-opacity-20 px-1 rounded">
+                    {stats.byLevel[level] || 0}
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleClearLogs}
-              className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-            >
-              Clear Logs
-            </button>
-            <button
-              onClick={() => handleExportLogs('json')}
-              className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-            >
-              Export JSON
-            </button>
-            <button
-              onClick={() => handleExportLogs('csv')}
-              className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
-            >
-              Export CSV
-            </button>
-            <button
-              onClick={() => handleExportLogs('txt')}
-              className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600"
-            >
-              Export TXT
-            </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 text-sm text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={autoScroll}
+                  onChange={(e) => setAutoScroll(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Auto-scroll</span>
+              </label>
+              <label className="flex items-center space-x-2 text-sm text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={showStackTrace}
+                  onChange={(e) => setShowStackTrace(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Show stack traces</span>
+              </label>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleExportLogs('json')}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>JSON</span>
+              </button>
+              <button
+                onClick={() => handleExportLogs('csv')}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>CSV</span>
+              </button>
+              <button
+                onClick={() => handleExportLogs('txt')}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>TXT</span>
+              </button>
+              <button
+                onClick={handleClearLogs}
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm flex items-center space-x-1"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Clear</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Log List */}
-        <div className="flex-1 overflow-auto p-4 bg-gray-900">
-          <div className="space-y-1 font-mono text-sm">
+        {/* Logs Container */}
+        <div className="flex-1 overflow-auto p-4 font-mono text-sm">
+          <div className="space-y-1">
             {filteredLogs.map((log) => (
-              <div
-                key={log.id}
-                className={`p-2 rounded border-l-4 ${
-                  log.level === 'error' ? 'border-red-500 bg-red-900/20' :
-                  log.level === 'warn' ? 'border-yellow-500 bg-yellow-900/20' :
-                  log.level === 'info' ? 'border-blue-500 bg-blue-900/20' :
-                  log.level === 'debug' ? 'border-gray-500 bg-gray-800/50' :
-                  'border-green-500 bg-green-900/20'
-                }`}
-              >
+              <div key={log.id} className="group hover:bg-gray-800 p-2 rounded">
                 <div className="flex items-start space-x-3">
-                  <span className="text-gray-400 text-xs whitespace-nowrap">
+                  {/* Timestamp */}
+                  <span className="text-gray-500 text-xs whitespace-nowrap">
                     {formatTimestamp(log.timestamp)}
                   </span>
-                  <span className={`text-xs font-medium uppercase ${getLevelColor(log.level)}`}>
-                    {log.level}
+                  
+                  {/* Level Badge */}
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getLevelBadgeColor(log.level)} whitespace-nowrap`}>
+                    {log.level.toUpperCase()}
                   </span>
+                  
+                  {/* Source */}
                   {log.source && (
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                    <span className="text-blue-400 text-xs whitespace-nowrap">
                       {log.source}
                     </span>
                   )}
-                  <div className="flex-1">
-                    <div className={`${getLevelColor(log.level)}`}>
+                  
+                  {/* Message */}
+                  <div className="flex-1 min-w-0">
+                    <div className={`${getLevelColor(log.level)} break-words`}>
                       {log.message}
                     </div>
-                    {showStackTrace && log.stack && log.level === 'error' && (
-                      <pre className="mt-2 text-xs text-gray-400 bg-gray-800 p-2 rounded overflow-x-auto">
+                    
+                    {/* Stack Trace */}
+                    {showStackTrace && log.stack && (
+                      <pre className="text-gray-400 text-xs mt-1 whitespace-pre-wrap overflow-auto">
                         {log.stack}
                       </pre>
+                    )}
+                    
+                    {/* Raw Arguments (for debugging) */}
+                    {log.args && log.args.length > 1 && (
+                      <details className="mt-1">
+                        <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-400">
+                          Raw arguments ({log.args.length})
+                        </summary>
+                        <pre className="text-gray-400 text-xs mt-1 whitespace-pre-wrap overflow-auto">
+                          {JSON.stringify(log.args, null, 2)}
+                        </pre>
+                      </details>
                     )}
                   </div>
                 </div>
               </div>
             ))}
+            
             {filteredLogs.length === 0 && (
-              <div className="text-center text-gray-400 py-8">
-                No logs match the current filters
+              <div className="text-center text-gray-500 py-8">
+                {logs.length === 0 ? 'No logs captured yet' : 'No logs match current filters'}
               </div>
             )}
           </div>
         </div>
 
-        {/* Stats Footer */}
-        <div className="p-3 border-t border-gray-700 bg-gray-800 text-xs text-gray-400">
-          <div className="flex justify-between">
+        {/* Footer Stats */}
+        <div className="border-t border-gray-700 p-3">
+          <div className="flex items-center justify-between text-xs text-gray-400">
             <div>
               Total: {stats.total} | 
-              Errors: {stats.byLevel.error} | 
-              Warnings: {stats.byLevel.warn} | 
-              Info: {stats.byLevel.info} | 
-              Debug: {stats.byLevel.debug}
+              Errors: {stats.byLevel.error || 0} | 
+              Warnings: {stats.byLevel.warn || 0} | 
+              Info: {stats.byLevel.info || 0} | 
+              Debug: {stats.byLevel.debug || 0}
             </div>
-            {stats.timeRange && (
-              <div>
-                {formatTimestamp(stats.timeRange.start)} - {formatTimestamp(stats.timeRange.end)}
-              </div>
-            )}
+            <div>
+              {autoScroll && filteredLogs.length > 0 && 'Auto-scrolling enabled'}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default LogViewer;
