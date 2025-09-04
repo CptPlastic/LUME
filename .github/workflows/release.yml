@@ -40,8 +40,47 @@ jobs:
           echo "tag-name=v$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
-  build:
+  generate-release-notes:
     needs: get-version
+    runs-on: ubuntu-latest
+    outputs:
+      release-notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate release notes
+        id: notes
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tail -1)
+          CURRENT_TAG=${{ needs.get-version.outputs.tag-name }}
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          echo "Generating notes from $PREVIOUS_TAG to $CURRENT_TAG"
+          
+          # Generate commit messages
+          COMMITS=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..$CURRENT_TAG 2>/dev/null || git log --pretty=format:"- %s" $PREVIOUS_TAG..HEAD)
+          
+          # Create release notes
+          NOTES="## Changes in v${{ needs.get-version.outputs.version }}
+
+          $COMMITS"
+          
+          # Save to output (handle multiline)
+          {
+            echo 'notes<<EOF'
+            echo "$NOTES"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+  build:
+    needs: [get-version, generate-release-notes]
     permissions:
       contents: write
     strategy:
@@ -139,28 +178,7 @@ jobs:
           projectPath: ./src/lume_desk
           tagName: ${{ needs.get-version.outputs.tag-name }}
           releaseName: 'LUME Controller v${{ needs.get-version.outputs.version }}'
-          releaseBody: |
-            ## 🎆 LUME Desktop Controller v${{ needs.get-version.outputs.version }}
-            
-            Professional firework and lighting control application.
-            
-            ### What's New
-            - Enhanced ARM/DISARM system for improved safety
-            - Fixed export functionality
-            - Improved play-from-cursor timing
-            - Better visual feedback and user experience
-            
-            ### Download Instructions
-            - **Windows**: Download `.exe` or `.msi` file
-            - **macOS**: Download `.dmg` file
-            - **Linux**: Download `.AppImage` or `.deb` file
-            
-            ### System Requirements
-            - **Windows**: Windows 10 or later
-            - **macOS**: macOS 10.15 (Catalina) or later
-            - **Linux**: Ubuntu 20.04+ or equivalent
-            
-            Built with ❤️ for the pyrotechnics community.
+          releaseBody: ${{ needs.generate-release-notes.outputs.release-notes }}
           releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
           prerelease: false
           args: ${{ matrix.args }}
@@ -175,32 +193,9 @@ jobs:
           tagName: ${{ needs.get-version.outputs.tag-name }}
           releaseName: 'LUME Controller v${{ needs.get-version.outputs.version }} (Unsigned)'
           releaseBody: |
-            ## 🎆 LUME Desktop Controller v${{ needs.get-version.outputs.version }}
+            ⚠️ **Note**: This macOS build is unsigned. Right-click and select "Open" to run it.
             
-            Professional firework and lighting control application.
-            
-            ⚠️ **macOS Security Note**: This build is unsigned. When you first run it:
-            1. Right-click the app and select "Open"
-            2. Click "Open" in the security dialog
-            3. Or go to System Preferences > Security & Privacy and allow it
-            
-            ### What's New
-            - Enhanced ARM/DISARM system for improved safety
-            - Fixed export functionality
-            - Improved play-from-cursor timing
-            - Better visual feedback and user experience
-            
-            ### Download Instructions
-            - **Windows**: Download `.exe` or `.msi` file
-            - **macOS**: Download `.dmg` file (unsigned - see security note above)
-            - **Linux**: Download `.AppImage` or `.deb` file
-            
-            ### System Requirements
-            - **Windows**: Windows 10 or later
-            - **macOS**: macOS 10.15 (Catalina) or later
-            - **Linux**: Ubuntu 20.04+ or equivalent
-            
-            Built with ❤️ for the pyrotechnics community.
+            ${{ needs.generate-release-notes.outputs.release-notes }}
           releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
           prerelease: false
           args: ${{ matrix.args }}
