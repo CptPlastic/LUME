@@ -79,8 +79,27 @@ jobs:
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
-  build:
+  create-github-release:
     needs: [get-version, generate-release-notes]
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create-release.outputs.id }}
+      upload-url: ${{ steps.create-release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.get-version.outputs.tag-name }}
+          release_name: 'LUME Controller v${{ needs.get-version.outputs.version }}'
+          body: ${{ needs.generate-release-notes.outputs.release-notes }}
+          draft: ${{ github.event.inputs.draft == 'true' || false }}
+          prerelease: false
+
+  build:
+    needs: [get-version, generate-release-notes, create-github-release]
     permissions:
       contents: write
     strategy:
@@ -181,6 +200,7 @@ jobs:
           releaseBody: ${{ needs.generate-release-notes.outputs.release-notes }}
           releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
           prerelease: false
+          releaseId: ${{ needs.create-github-release.outputs.release-id }}
           args: ${{ matrix.args }}
 
       - name: Build the app (unsigned macOS)
@@ -198,6 +218,7 @@ jobs:
             ${{ needs.generate-release-notes.outputs.release-notes }}
           releaseDraft: ${{ github.event.inputs.draft == 'true' || false }}
           prerelease: false
+          releaseId: ${{ needs.create-github-release.outputs.release-id }}
           args: ${{ matrix.args }}
 
       - name: Code signing status
@@ -217,7 +238,7 @@ jobs:
             echo "  • APPLE_TEAM_ID"
           fi
 
-  create-release:
+  release-summary:
     needs: [get-version, build]
     runs-on: ubuntu-latest
     if: success()
