@@ -18,7 +18,7 @@ interface UpdateStatus {
 }
 
 export class VersionService {
-  private static readonly UPDATE_CHECK_URL = process.env.VITE_UPDATE_URL || 'https://api.lume-controller.com/updates';
+  private static readonly UPDATE_CHECK_URL = import.meta.env.VITE_UPDATE_URL || 'https://api.lume-controller.com/updates/latest';
   private static readonly CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
   private static readonly STORAGE_KEY = 'lume-version-check';
 
@@ -28,7 +28,7 @@ export class VersionService {
     console.log(`🔍 Checking for updates... Current version: ${currentVersion}`);
 
     try {
-      const response = await axios.get<VersionInfo>(`${this.UPDATE_CHECK_URL}/latest`, {
+      const response = await axios.get<VersionInfo>(this.UPDATE_CHECK_URL, {
         timeout: 10000,
         headers: {
           'X-Current-Version': currentVersion,
@@ -72,11 +72,17 @@ export class VersionService {
 
   // Check if we're online or connected to LUME network
   static async detectNetworkMode(): Promise<'online' | 'lume' | 'offline'> {
+    // First check if user has manually enabled offline mode
+    if (this.isOfflineModeEnabled()) {
+      console.log('🔧 User has offline mode enabled - returning offline');
+      return 'offline';
+    }
+
     try {
-      // First check if we can reach the internet
+      // Check if we can reach the internet
       const onlineTest = axios.create({ timeout: 5000 });
       try {
-        await onlineTest.get('https://api.lume-controller.com/ping');
+        await onlineTest.get('https://api.p7n.co/ping');
         return 'online';
       } catch {
         // Check if we're on LUME network by looking for controllers

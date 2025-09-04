@@ -82,9 +82,16 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
     setIsDownloading(false);
   };
 
-  const handleToggleOfflineMode = () => {
+  const handleToggleOfflineMode = async () => {
     console.log('🔄 Toggling offline mode from UpdateNotification');
     toggleOfflineMode();
+    
+    // Re-check network mode after toggle to update UI immediately
+    setTimeout(async () => {
+      const mode = await VersionService.detectNetworkMode();
+      setNetworkMode(mode);
+      console.log('🌐 Network mode updated to:', mode);
+    }, 100);
   };
 
   const handleDismiss = () => {
