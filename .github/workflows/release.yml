@@ -82,21 +82,34 @@ jobs:
   create-github-release:
     needs: [get-version, generate-release-notes]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      release-id: ${{ steps.create-release.outputs.id }}
-      upload-url: ${{ steps.create-release.outputs.upload_url }}
+      release-id: ${{ steps.create-release.outputs.release-id }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: Create Release
         id: create-release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.get-version.outputs.tag-name }}
-          release_name: 'LUME Controller v${{ needs.get-version.outputs.version }}'
-          body: ${{ needs.generate-release-notes.outputs.release-notes }}
-          draft: ${{ github.event.inputs.draft == 'true' || false }}
-          prerelease: false
+        run: |
+          RELEASE_NOTES="${{ needs.generate-release-notes.outputs.release-notes }}"
+          DRAFT_FLAG=""
+          if [[ "${{ github.event.inputs.draft }}" == "true" ]]; then
+            DRAFT_FLAG="--draft"
+          fi
+          
+          RELEASE_OUTPUT=$(gh release create "${{ needs.get-version.outputs.tag-name }}" \
+            --title "LUME Controller v${{ needs.get-version.outputs.version }}" \
+            --notes "$RELEASE_NOTES" \
+            $DRAFT_FLAG \
+            --repo "${{ github.repository }}")
+          
+          # Extract release ID from the URL
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ needs.get-version.outputs.tag-name }} --jq .id)
+          echo "release-id=$RELEASE_ID" >> $GITHUB_OUTPUT
 
   build:
     needs: [get-version, generate-release-notes, create-github-release]
