@@ -12,6 +12,7 @@ import {
 import { VersionService } from '../services/version-service';
 import { useLumeStore } from '../store/lume-store';
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface UpdateNotificationProps {
   // No props needed - component manages its own state
 }
@@ -93,7 +94,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
         window.removeEventListener('offline', handleOffline);
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkNetworkAndUpdates = async () => {
     setIsChecking(true);
