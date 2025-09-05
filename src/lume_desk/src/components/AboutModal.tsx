@@ -14,7 +14,17 @@ interface UpdateStatus {
   latestVersion?: string;
   error?: string;
   versionInfo?: {
+    version: string;
+    releaseDate: string;
+    changelog: string;
     downloadUrl?: string;
+    downloads?: {
+      macos?: string;
+      linux?: string;
+      windows?: string;
+      web?: string;
+    };
+    critical: boolean;
   };
 }
 
@@ -51,8 +61,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleDownloadUpdate = async () => {
-    if (updateStatus?.versionInfo?.downloadUrl) {
-      await VersionService.downloadUpdate(updateStatus.versionInfo.downloadUrl);
+    if (updateStatus?.versionInfo) {
+      await VersionService.downloadUpdate(updateStatus.versionInfo);
     }
   };
 

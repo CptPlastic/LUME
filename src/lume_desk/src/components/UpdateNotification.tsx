@@ -25,6 +25,12 @@ interface UpdateStatus {
     releaseDate: string;
     changelog: string;
     downloadUrl?: string;
+    downloads?: {
+      macos?: string;
+      linux?: string;
+      windows?: string;
+      web?: string;
+    };
     critical: boolean;
   };
   error?: string;
@@ -101,16 +107,17 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
 
   const handleCheckForUpdates = async () => {
     setIsChecking(true);
+    setDismissed(false); // Reset dismissal state when manually checking
     const status = await VersionService.checkForUpdates();
     setUpdateStatus(status);
     setIsChecking(false);
   };
 
   const handleDownloadUpdate = async () => {
-    if (!updateStatus?.versionInfo?.downloadUrl) return;
+    if (!updateStatus?.versionInfo) return;
     
     setIsDownloading(true);
-    const success = await VersionService.downloadUpdate(updateStatus.versionInfo.downloadUrl);
+    const success = await VersionService.downloadUpdate(updateStatus.versionInfo);
     
     if (success) {
       console.log('✅ Update download started');
@@ -171,8 +178,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
     }
   };
 
-  // Don't render if dismissed
-  if (dismissed) return null;
+  // Reset dismissal if a new update is found
+  React.useEffect(() => {
+    if (updateStatus?.hasUpdate && updateStatus.versionInfo?.critical) {
+      setDismissed(false); // Critical updates can't be permanently dismissed
+    }
+  }, [updateStatus]);
 
   return (
     <div className="space-y-3">
@@ -233,7 +244,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
       </div>
 
       {/* Update Available Notification */}
-      {updateStatus?.hasUpdate && updateStatus.versionInfo && (
+      {updateStatus?.hasUpdate && updateStatus.versionInfo && (!dismissed || updateStatus.versionInfo.critical) && (
         <div className={`bg-gradient-to-r p-4 rounded-lg border-l-4 ${
           updateStatus.versionInfo.critical 
             ? 'from-red-900/20 to-red-800/10 border-red-500' 
@@ -270,7 +281,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  {updateStatus.versionInfo.downloadUrl && (
+                  {(updateStatus.versionInfo.downloadUrl || updateStatus.versionInfo.downloads) && (
                     <button
                       onClick={handleDownloadUpdate}
                       disabled={isDownloading}

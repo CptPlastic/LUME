@@ -6,6 +6,12 @@ interface VersionInfo {
   releaseDate: string;
   changelog: string;
   downloadUrl?: string;
+  downloads?: {
+    macos?: string;
+    linux?: string;
+    windows?: string;
+    web?: string;
+  };
   critical: boolean;
 }
 
@@ -218,8 +224,35 @@ export class VersionService {
     return 'offline';
   }
 
+  // Get platform-specific download URL
+  static getPlatformDownloadUrl(versionInfo: VersionInfo): string | null {
+    const platform = this.getPlatform();
+    
+    // Try platform-specific downloads first
+    if (versionInfo.downloads) {
+      switch (platform) {
+        case 'darwin':
+          return versionInfo.downloads.macos || null;
+        case 'windows':
+          return versionInfo.downloads.windows || null;
+        case 'linux':
+          return versionInfo.downloads.linux || null;
+        case 'web':
+          return versionInfo.downloads.web || null;
+      }
+    }
+    
+    // Fallback to generic downloadUrl
+    return versionInfo.downloadUrl || null;
+  }
+
   // Download and install update (Tauri-specific)
-  static async downloadUpdate(downloadUrl: string): Promise<boolean> {
+  static async downloadUpdate(versionInfo: VersionInfo): Promise<boolean> {
+    const downloadUrl = this.getPlatformDownloadUrl(versionInfo);
+    if (!downloadUrl) {
+      console.error('❌ No download URL available for current platform');
+      return false;
+    }
     console.log(`📥 Starting download from: ${downloadUrl}`);
     
     try {
