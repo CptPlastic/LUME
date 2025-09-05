@@ -13,7 +13,7 @@ import { VersionService } from '../services/version-service';
 import { useLumeStore } from '../store/lume-store';
 
 interface UpdateNotificationProps {
-  onDismiss?: () => void;
+  // No props needed - component manages its own state
 }
 
 interface UpdateStatus {
@@ -36,7 +36,7 @@ interface UpdateStatus {
   error?: string;
 }
 
-export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismiss }) => {
+export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
   const { isOfflineMode, toggleOfflineMode } = useLumeStore();
   
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
@@ -108,6 +108,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
   const handleCheckForUpdates = async () => {
     setIsChecking(true);
     setDismissed(false); // Reset dismissal state when manually checking
+    VersionService.clearUpdateCache(); // Clear cache to force fresh check
     const status = await VersionService.checkForUpdates();
     setUpdateStatus(status);
     setIsChecking(false);
@@ -142,7 +143,6 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
 
   const handleDismiss = () => {
     setDismissed(true);
-    onDismiss?.();
   };
 
   const getNetworkIcon = () => {
@@ -281,7 +281,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  {(updateStatus.versionInfo.downloadUrl || updateStatus.versionInfo.downloads) && (
+                  {(updateStatus.versionInfo.downloadUrl || updateStatus.versionInfo.downloads || (updateStatus.versionInfo as any).platforms) && (
                     <button
                       onClick={handleDownloadUpdate}
                       disabled={isDownloading}

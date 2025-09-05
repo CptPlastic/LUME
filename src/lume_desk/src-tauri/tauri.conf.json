@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "LUME",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "identifier": "com.lume.controller",
   "build": {
     "frontendDist": "../dist",
@@ -41,10 +41,20 @@
             "fs:allow-write-file",
             "core:default",
             "http:default",
-            "updater:default"
+            "updater:default",
+            "shell:default",
+            "shell:allow-open"
           ]
         }
       ]
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": ["https://api.p7n.co/tauri"],
+      "dialog": true,
+      "pubkey": ""
     }
   },
   "bundle": {

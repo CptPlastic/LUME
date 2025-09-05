@@ -16,7 +16,6 @@ function App() {
   
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showUpdateNotification, setShowUpdateNotification] = useState(true);
   const { restoreShowAudio, currentShow, startStatusRefresh, stopStatusRefresh } = useLumeStore();
 
   // Initialize app and restore audio on startup
@@ -129,14 +128,12 @@ function App() {
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <Header currentView={currentView} onViewChange={setCurrentView} />
       
-      {/* Update Notification - shows network status and version updates */}
-      {showUpdateNotification && (
-        <div className="p-4 bg-gray-900">
-          <div className="max-w-7xl mx-auto">
-            <UpdateNotification onDismiss={() => setShowUpdateNotification(false)} />
-          </div>
+      {/* Network Status & Update Notification - always show network status */}
+      <div className="p-4 bg-gray-900">
+        <div className="max-w-7xl mx-auto">
+          <UpdateNotification />
         </div>
-      )}
+      </div>
       
       {renderCurrentView()}
     </div>

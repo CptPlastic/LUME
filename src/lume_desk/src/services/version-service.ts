@@ -33,6 +33,7 @@ export class VersionService {
     const currentVersion = getBaseVersion(); // Use semantic version for comparison
     const displayVersion = getAppVersion();  // Keep git hash for display
     console.log(`🔍 Checking for updates... Current version: ${currentVersion} (display: ${displayVersion})`);
+    console.log(`📡 Using update URL: ${this.UPDATE_CHECK_URL}`);
 
     try {
       const response = await axios.get<VersionInfo>(this.UPDATE_CHECK_URL, {
@@ -44,7 +45,11 @@ export class VersionService {
       });
 
       const versionInfo = response.data;
-      const hasUpdate = this.compareVersions(currentVersion, versionInfo.version) < 0;
+      const compareResult = this.compareVersions(currentVersion, versionInfo.version);
+      const hasUpdate = compareResult < 0;
+      
+      console.log(`📊 Version comparison: ${currentVersion} vs ${versionInfo.version}`);
+      console.log(`📊 Compare result: ${compareResult} (${compareResult < 0 ? 'UPDATE AVAILABLE' : 'UP TO DATE'})`);
 
       const updateStatus: UpdateStatus = {
         hasUpdate,
@@ -227,23 +232,58 @@ export class VersionService {
   // Get platform-specific download URL
   static getPlatformDownloadUrl(versionInfo: VersionInfo): string | null {
     const platform = this.getPlatform();
+    console.log(`🖥️ Detected platform: ${platform}`);
+    console.log(`📦 Available downloads:`, versionInfo.downloads);
+    console.log(`📦 Available platforms:`, (versionInfo as any).platforms);
     
     // Try platform-specific downloads first
-    if (versionInfo.downloads) {
-      switch (platform) {
-        case 'darwin':
-          return versionInfo.downloads.macos || null;
-        case 'windows':
-          return versionInfo.downloads.windows || null;
-        case 'linux':
-          return versionInfo.downloads.linux || null;
-        case 'web':
-          return versionInfo.downloads.web || null;
+    const platforms = (versionInfo as any).platforms || versionInfo.downloads;
+    if (platforms) {
+      let selectedUrl: string | null = null;
+      
+      // Handle Tauri platforms format
+      if ((versionInfo as any).platforms) {
+        const arch = 'x86_64'; // Default to x86_64, could detect actual arch later
+        switch (platform) {
+          case 'darwin':
+            selectedUrl = platforms[`darwin-${arch}`]?.url || platforms['darwin-aarch64']?.url || null;
+            break;
+          case 'windows':
+            selectedUrl = platforms[`windows-${arch}`]?.url || null;
+            break;
+          case 'linux':
+            selectedUrl = platforms[`linux-${arch}`]?.url || null;
+            break;
+        }
+      } 
+      // Handle legacy downloads format
+      else if (versionInfo.downloads) {
+        switch (platform) {
+          case 'darwin':
+            selectedUrl = versionInfo.downloads.macos || null;
+            break;
+          case 'windows':
+            selectedUrl = versionInfo.downloads.windows || null;
+            break;
+          case 'linux':
+            selectedUrl = versionInfo.downloads.linux || null;
+            break;
+          case 'web':
+            selectedUrl = versionInfo.downloads.web || null;
+            break;
+        }
+      }
+      
+      if (selectedUrl) {
+        console.log(`✅ Using platform-specific download: ${selectedUrl}`);
+        return selectedUrl;
       }
     }
     
     // Fallback to generic downloadUrl
-    return versionInfo.downloadUrl || null;
+    const fallbackUrl = versionInfo.downloadUrl || null;
+    console.log(`🔄 Using fallback download URL: ${fallbackUrl}`);
+    return fallbackUrl;
   }
 
   // Download and install update (Tauri-specific)
@@ -256,47 +296,123 @@ export class VersionService {
     console.log(`📥 Starting download from: ${downloadUrl}`);
     
     try {
-      // Check if running in Tauri
-      const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+      // Check if running in Tauri (multiple detection methods)
+      const hasWindow = typeof window !== 'undefined';
+      const hasTauriGlobal = hasWindow && '__TAURI__' in window;
+      const hasTauriInvoke = hasWindow && (window as any).__TAURI_INVOKE__;
+      const hasTauriAPI = hasWindow && (window as any).__TAURI_INTERNALS__;
+      const isFileProtocol = hasWindow && window.location.protocol === 'tauri:';
+      
+      const isTauri = hasTauriGlobal || hasTauriInvoke || hasTauriAPI || isFileProtocol;
+      
+      console.log(`🔍 Tauri detection debug:`, {
+        hasWindow,
+        hasTauriGlobal,
+        hasTauriInvoke, 
+        hasTauriAPI,
+        isFileProtocol,
+        protocol: hasWindow ? window.location.protocol : 'no-window',
+        isTauri
+      });
       
       if (isTauri) {
+        console.log('🚀 Using Tauri download methods...');
         // Use Tauri updater if available
         try {
-          // Dynamic import with error handling for missing modules
-          const { check } = await import('@tauri-apps/plugin-updater').catch(() => ({ 
-            check: null 
-          }));
+          console.log('🔍 Attempting to import Tauri updater...');
+          const updaterModule = await import('@tauri-apps/plugin-updater').catch((error) => {
+            console.log('❌ Failed to import updater module:', error);
+            return null;
+          });
           
-          if (check) {
-            const update = await check();
-            if (update) {
-              console.log('🔄 Installing update...');
-              await update.downloadAndInstall();
-              return true;
-            } else {
-              console.log('ℹ️ No update available through Tauri updater');
+          if (updaterModule?.check) {
+            console.log('✅ Tauri updater module loaded, checking for update...');
+            
+            try {
+              const update = await updaterModule.check();
+              console.log('🔍 Tauri updater check result:', update);
+              
+              if (update) {
+                console.log('🔄 Update found via Tauri updater, starting download and install...');
+                console.log('📋 Update details:', {
+                  version: update.version,
+                  date: update.date,
+                  body: update.body
+                });
+                
+                await update.downloadAndInstall();
+                console.log('✅ Tauri updater installation complete - app will restart');
+                return true;
+              } else {
+                console.log('ℹ️ No update available through Tauri updater, trying manual download');
+              }
+            } catch (checkError) {
+              console.log('❌ Tauri updater check failed:', checkError);
             }
+          } else {
+            console.log('❌ Tauri updater check function not available');
           }
-        } catch {
-          console.log('⚠️ Tauri updater not available, using manual download');
+        } catch (importError) {
+          console.log('⚠️ Tauri updater not available:', importError);
         }
         
         // Fallback to manual download with Tauri
+        console.log('🔄 Trying Tauri shell to open download URL...');
         try {
           const { open } = await import('@tauri-apps/plugin-shell').catch(() => ({ open: null }));
           if (open) {
+            console.log('✅ Tauri shell available, opening download URL...');
             await open(downloadUrl);
+            console.log('✅ Download initiated through Tauri shell');
             return true;
+          } else {
+            console.log('❌ Tauri shell open function not available');
           }
-        } catch {
-          console.log('⚠️ Tauri shell not available, falling back to browser');
+        } catch (error) {
+          console.log('⚠️ Tauri shell error:', error);
+          console.log('⚠️ Falling back to browser download');
         }
+      } else {
+        console.log('🌐 Not in Tauri environment, using browser download...');
       }
       
-      // Browser environment or Tauri fallback - open download link
+      // Browser environment or Tauri fallback - try direct download
       if (typeof window !== 'undefined') {
-        window.open(downloadUrl, '_blank');
-        return true;
+        console.log('🌐 Attempting direct download...');
+        
+        try {
+          // Try to create a direct download link
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = downloadUrl.split('/').pop() || 'update.dmg';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          console.log('✅ Direct download link clicked');
+          return true;
+        } catch (directError) {
+          console.log('⚠️ Direct download failed, trying window.open:', directError);
+          
+          // Fallback to window.open
+          const result = window.open(downloadUrl, '_blank');
+          if (result) {
+            console.log('✅ Browser download initiated via window.open');
+            return true;
+          } else {
+            console.log('❌ window.open was blocked by popup blocker');
+            
+            // Final fallback - try to navigate to the URL
+            try {
+              window.location.href = downloadUrl;
+              console.log('✅ Navigating to download URL');
+              return true;
+            } catch (navError) {
+              console.log('❌ Navigation fallback failed:', navError);
+            }
+          }
+        }
+      } else {
+        console.log('❌ No window object available');
       }
       
       return false;
@@ -364,15 +480,43 @@ export class VersionService {
   // Get current platform for update targeting
   private static getPlatform(): string {
     const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+    console.log(`🔍 Platform detection - isTauri: ${isTauri}, window.__TAURI__:`, typeof window !== 'undefined' ? (window as any).__TAURI__ : 'undefined');
     
-    if (isTauri && typeof navigator !== 'undefined') {
-      // Try to detect OS from user agent
+    // Always try to detect OS from user agent, regardless of Tauri detection
+    if (typeof navigator !== 'undefined') {
       const userAgent = navigator.userAgent.toLowerCase();
-      if (userAgent.includes('mac')) return 'darwin';
-      if (userAgent.includes('win')) return 'windows';
-      if (userAgent.includes('linux')) return 'linux';
+      console.log(`🔍 User agent: ${userAgent}`);
+      
+      // macOS detection
+      if (userAgent.includes('mac') || userAgent.includes('darwin')) {
+        console.log(`✅ Detected macOS`);
+        return 'darwin';
+      }
+      
+      // Windows detection
+      if (userAgent.includes('win')) {
+        console.log(`✅ Detected Windows`);
+        return 'windows';
+      }
+      
+      // Linux detection
+      if (userAgent.includes('linux') && !userAgent.includes('android')) {
+        console.log(`✅ Detected Linux`);
+        return 'linux';
+      }
     }
     
+    // Also try platform API if available (deprecated but still useful fallback)
+    if (typeof navigator !== 'undefined' && 'platform' in navigator) {
+      const platform = (navigator as any).platform?.toLowerCase();
+      console.log(`🔍 Navigator platform: ${platform}`);
+      
+      if (platform && platform.includes('mac')) return 'darwin';
+      if (platform && platform.includes('win')) return 'windows';
+      if (platform && platform.includes('linux')) return 'linux';
+    }
+    
+    console.log(`⚠️ Falling back to web platform`);
     return 'web';
   }
 
