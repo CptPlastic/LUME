@@ -12,6 +12,12 @@ interface VersionInfo {
     windows?: string;
     web?: string;
   };
+  platforms?: {
+    [key: string]: {
+      signature?: string;
+      url: string;
+    };
+  };
   critical: boolean;
 }
 
@@ -234,15 +240,15 @@ export class VersionService {
     const platform = this.getPlatform();
     console.log(`🖥️ Detected platform: ${platform}`);
     console.log(`📦 Available downloads:`, versionInfo.downloads);
-    console.log(`📦 Available platforms:`, (versionInfo as any).platforms);
+    console.log(`📦 Available platforms:`, versionInfo.platforms);
     
     // Try platform-specific downloads first
-    const platforms = (versionInfo as any).platforms || versionInfo.downloads;
+    const platforms = versionInfo.platforms || versionInfo.downloads;
     if (platforms) {
       let selectedUrl: string | null = null;
       
       // Handle Tauri platforms format
-      if ((versionInfo as any).platforms) {
+      if (versionInfo.platforms) {
         const arch = 'x86_64'; // Default to x86_64, could detect actual arch later
         switch (platform) {
           case 'darwin':
@@ -299,8 +305,8 @@ export class VersionService {
       // Check if running in Tauri (multiple detection methods)
       const hasWindow = typeof window !== 'undefined';
       const hasTauriGlobal = hasWindow && '__TAURI__' in window;
-      const hasTauriInvoke = hasWindow && (window as any).__TAURI_INVOKE__;
-      const hasTauriAPI = hasWindow && (window as any).__TAURI_INTERNALS__;
+      const hasTauriInvoke = hasWindow && '__TAURI_INVOKE__' in window;
+      const hasTauriAPI = hasWindow && '__TAURI_INTERNALS__' in window;
       const isFileProtocol = hasWindow && window.location.protocol === 'tauri:';
       
       const isTauri = hasTauriGlobal || hasTauriInvoke || hasTauriAPI || isFileProtocol;
@@ -480,7 +486,7 @@ export class VersionService {
   // Get current platform for update targeting
   private static getPlatform(): string {
     const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-    console.log(`🔍 Platform detection - isTauri: ${isTauri}, window.__TAURI__:`, typeof window !== 'undefined' ? (window as any).__TAURI__ : 'undefined');
+    console.log(`🔍 Platform detection - isTauri: ${isTauri}`);
     
     // Always try to detect OS from user agent, regardless of Tauri detection
     if (typeof navigator !== 'undefined') {
@@ -508,7 +514,7 @@ export class VersionService {
     
     // Also try platform API if available (deprecated but still useful fallback)
     if (typeof navigator !== 'undefined' && 'platform' in navigator) {
-      const platform = (navigator as any).platform?.toLowerCase();
+      const platform = (navigator.platform)?.toLowerCase();
       console.log(`🔍 Navigator platform: ${platform}`);
       
       if (platform && platform.includes('mac')) return 'darwin';

@@ -31,6 +31,12 @@ interface UpdateStatus {
       windows?: string;
       web?: string;
     };
+    platforms?: {
+      [key: string]: {
+        signature?: string;
+        url: string;
+      };
+    };
     critical: boolean;
   };
   error?: string;
@@ -281,7 +287,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  {(updateStatus.versionInfo.downloadUrl || updateStatus.versionInfo.downloads || (updateStatus.versionInfo as any).platforms) && (
+                  {(updateStatus.versionInfo.downloadUrl || updateStatus.versionInfo.downloads || updateStatus.versionInfo.platforms) && (
                     <button
                       onClick={handleDownloadUpdate}
                       disabled={isDownloading}
