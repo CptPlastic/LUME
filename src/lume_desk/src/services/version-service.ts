@@ -243,47 +243,44 @@ export class VersionService {
     console.log(`📦 Available platforms:`, versionInfo.platforms);
     
     // Try platform-specific downloads first
-    const platforms = versionInfo.platforms || versionInfo.downloads;
-    if (platforms) {
-      let selectedUrl: string | null = null;
-      
-      // Handle Tauri platforms format
-      if (versionInfo.platforms) {
-        const arch = 'x86_64'; // Default to x86_64, could detect actual arch later
-        switch (platform) {
-          case 'darwin':
-            selectedUrl = platforms[`darwin-${arch}`]?.url || platforms['darwin-aarch64']?.url || null;
-            break;
-          case 'windows':
-            selectedUrl = platforms[`windows-${arch}`]?.url || null;
-            break;
-          case 'linux':
-            selectedUrl = platforms[`linux-${arch}`]?.url || null;
-            break;
-        }
-      } 
-      // Handle legacy downloads format
-      else if (versionInfo.downloads) {
-        switch (platform) {
-          case 'darwin':
-            selectedUrl = versionInfo.downloads.macos || null;
-            break;
-          case 'windows':
-            selectedUrl = versionInfo.downloads.windows || null;
-            break;
-          case 'linux':
-            selectedUrl = versionInfo.downloads.linux || null;
-            break;
-          case 'web':
-            selectedUrl = versionInfo.downloads.web || null;
-            break;
-        }
+    let selectedUrl: string | null = null;
+    
+    // Handle Tauri platforms format
+    if (versionInfo.platforms) {
+      const arch = 'x86_64'; // Default to x86_64, could detect actual arch later
+      switch (platform) {
+        case 'darwin':
+          selectedUrl = versionInfo.platforms[`darwin-${arch}`]?.url || versionInfo.platforms['darwin-aarch64']?.url || null;
+          break;
+        case 'windows':
+          selectedUrl = versionInfo.platforms[`windows-${arch}`]?.url || null;
+          break;
+        case 'linux':
+          selectedUrl = versionInfo.platforms[`linux-${arch}`]?.url || null;
+          break;
       }
-      
-      if (selectedUrl) {
-        console.log(`✅ Using platform-specific download: ${selectedUrl}`);
-        return selectedUrl;
+    } 
+    // Handle legacy downloads format
+    else if (versionInfo.downloads) {
+      switch (platform) {
+        case 'darwin':
+          selectedUrl = versionInfo.downloads.macos || null;
+          break;
+        case 'windows':
+          selectedUrl = versionInfo.downloads.windows || null;
+          break;
+        case 'linux':
+          selectedUrl = versionInfo.downloads.linux || null;
+          break;
+        case 'web':
+          selectedUrl = versionInfo.downloads.web || null;
+          break;
       }
+    }
+    
+    if (selectedUrl) {
+      console.log(`✅ Using platform-specific download: ${selectedUrl}`);
+      return selectedUrl;
     }
     
     // Fallback to generic downloadUrl
