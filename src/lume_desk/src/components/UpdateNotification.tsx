@@ -4,8 +4,8 @@ import {
   X, 
   AlertCircle, 
   WifiOff, 
+  Wifi,
   Globe, 
-  Zap,
   RefreshCw,
   Settings
 } from 'lucide-react';
@@ -39,9 +39,48 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
   const [isDownloading, setIsDownloading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  // Check network mode and updates on component mount
+  // Check network mode and updates on component mount and set up periodic checks
   useEffect(() => {
     checkNetworkAndUpdates();
+    
+    // Set up periodic network checks every 30 seconds
+    const networkCheckInterval = setInterval(async () => {
+      if (!isChecking) {
+        const mode = await VersionService.detectNetworkMode();
+        if (mode !== networkMode) {
+          console.log('🔄 Network mode changed from', networkMode, 'to', mode);
+          setNetworkMode(mode);
+        }
+      }
+    }, 30000);
+
+    // Listen for browser online/offline events
+    const handleOnline = async () => {
+      console.log('🌐 Browser online event detected');
+      setTimeout(async () => {
+        const mode = await VersionService.detectNetworkMode();
+        setNetworkMode(mode);
+      }, 1000);
+    };
+
+    const handleOffline = () => {
+      console.log('🔌 Browser offline event detected');
+      setNetworkMode('offline');
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
+
+    // Cleanup
+    return () => {
+      clearInterval(networkCheckInterval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
+    };
   }, []);
 
   const checkNetworkAndUpdates = async () => {
@@ -104,7 +143,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
       case 'online':
         return <Globe className="w-4 h-4 text-green-500" />;
       case 'lume':
-        return <Zap className="w-4 h-4 text-lume-primary" />;
+        return <Wifi className="w-4 h-4 text-orange-500" />;
       case 'offline':
         return <WifiOff className="w-4 h-4 text-gray-500" />;
     }
@@ -113,9 +152,9 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
   const getNetworkLabel = () => {
     switch (networkMode) {
       case 'online':
-        return 'Online';
+        return 'Internet Connected';
       case 'lume':
-        return 'LUME Network';
+        return 'LUME WiFi Connected';
       case 'offline':
         return 'Offline';
     }
@@ -124,11 +163,11 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onDismis
   const getNetworkDescription = () => {
     switch (networkMode) {
       case 'online':
-        return 'Connected to internet - updates available';
+        return 'Connected to internet - updates and show building available';
       case 'lume':
-        return 'Connected to LUME controllers - show building enabled';
+        return 'Connected to LUME show WiFi - controllers available, no internet updates';
       case 'offline':
-        return isOfflineMode ? 'Offline mode - show building enabled' : 'Offline - show building limited';
+        return isOfflineMode ? 'Offline mode enabled - show building without validation' : 'No network connection - limited functionality';
     }
   };
 

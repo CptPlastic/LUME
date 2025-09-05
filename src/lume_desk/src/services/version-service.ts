@@ -78,30 +78,143 @@ export class VersionService {
       return 'offline';
     }
 
-    try {
-      // Check if we can reach the internet
-      const onlineTest = axios.create({ timeout: 5000 });
-      try {
-        await onlineTest.get('https://api.p7n.co/ping');
-        return 'online';
-      } catch {
-        // Check if we're on LUME network by looking for controllers
-        const lumeTest = axios.create({ timeout: 3000 });
-        try {
-          await lumeTest.get('http://lume-controller.local/status');
-          return 'lume';
-        } catch {
-          try {
-            await lumeTest.get('http://lume-lighting.local/status');
-            return 'lume';
-          } catch {
-            return 'offline';
-          }
-        }
-      }
-    } catch {
+    console.log('🌐 Detecting network mode...');
+    
+    // Check browser's navigator.onLine first (basic connectivity check)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.log('🔌 Browser reports offline - returning offline');
       return 'offline';
     }
+
+    // Test connectivity using your API endpoint first
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      console.log('🔍 Testing internet connectivity via your API...');
+      const response = await fetch('https://api.p7n.co/ping', {
+        method: 'GET',
+        signal: controller.signal,
+        cache: 'no-cache'
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        console.log('✅ Internet connectivity confirmed via api.p7n.co');
+        
+        // Even when online, check if we're also on LUME network for additional info
+        try {
+          // Try DNS resolution of lume-base.local to see if we're on the LUME network
+          await fetch('http://lume-base.local:22', {  // Try SSH port as it's commonly open
+            method: 'HEAD',
+            signal: AbortSignal.timeout(500),
+            cache: 'no-cache'
+          });
+        } catch (error) {
+          // Any network-level response (even connection refused) means host is reachable
+          if (error instanceof Error && (error.message.includes('Failed to fetch') || error.name === 'TypeError')) {
+            console.log('📍 Also detected on LUME network while online');
+          }
+        }
+        
+        return 'online';
+      } else {
+        console.log('❌ Your API test failed with status:', response.status);
+      }
+    } catch (error) {
+      console.log('❌ Your API connectivity test failed:', error instanceof Error ? error.message : 'Unknown error');
+      
+      // Fallback to a reliable test endpoint if your API fails
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        console.log('🔍 Fallback internet connectivity test...');
+        const response = await fetch('https://httpbin.org/status/200', {
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-cache'
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          console.log('✅ Internet connectivity confirmed via fallback endpoint');
+          return 'online';
+        }
+      } catch (fallbackError) {
+        console.log('❌ Fallback connectivity test also failed:', fallbackError instanceof Error ? fallbackError.message : 'Unknown error');
+      }
+    }
+
+    // If internet failed, check for local LUME network
+    console.log('🔍 Checking for LUME network...');
+    
+    // Try to detect LUME network by checking if we can resolve .local hostnames
+    console.log('🔍 Testing LUME base router hostname resolution...');
+    
+    // First, try a simple connectivity test to lume-base.local
+    try {
+      // Use a very short timeout connection test - we just want to see if hostname resolves
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+      
+      await fetch('http://lume-base.local:80', {
+        method: 'HEAD',
+        signal: controller.signal,
+        cache: 'no-cache'
+      });
+      
+      clearTimeout(timeoutId);
+      console.log('✅ LUME base router found and responding');
+      return 'lume';
+      
+    } catch (error) {
+      // Even if connection fails, check if it's because hostname resolved
+      if (error instanceof Error) {
+        if (error.name === 'AbortError' || 
+            error.message.includes('Failed to fetch') || 
+            error.message.includes('fetch') ||
+            error.message.includes('NetworkError')) {
+          console.log('🔧 LUME network detected - lume-base.local hostname resolves');
+          return 'lume';
+        }
+      }
+      console.log('❌ lume-base.local not reachable:', error instanceof Error ? error.message : 'Unknown error');
+    }
+    
+    // Fallback: try other LUME devices
+    console.log('🔍 Checking for other LUME devices...');
+    const lumeTests = [
+      'http://lume-controller.local/status',
+      'http://lume-lighting.local/status',
+    ];
+    
+    for (const testUrl of lumeTests) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-cache'
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          console.log('🔧 LUME network detected via:', testUrl);
+          return 'lume';
+        }
+      } catch {
+        // Continue to next test
+      }
+    }
+    
+    console.log('🌐 No LUME network connectivity detected');
+    return 'offline';
   }
 
   // Download and install update (Tauri-specific)
