@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAppVersion } from '../utils/version';
+import { getAppVersion, getBaseVersion } from '../utils/version';
 
 interface VersionInfo {
   version: string;
@@ -24,8 +24,9 @@ export class VersionService {
 
   // Check for updates from remote server
   static async checkForUpdates(): Promise<UpdateStatus> {
-    const currentVersion = getAppVersion();
-    console.log(`🔍 Checking for updates... Current version: ${currentVersion}`);
+    const currentVersion = getBaseVersion(); // Use semantic version for comparison
+    const displayVersion = getAppVersion();  // Keep git hash for display
+    console.log(`🔍 Checking for updates... Current version: ${currentVersion} (display: ${displayVersion})`);
 
     try {
       const response = await axios.get<VersionInfo>(this.UPDATE_CHECK_URL, {
@@ -41,7 +42,7 @@ export class VersionService {
 
       const updateStatus: UpdateStatus = {
         hasUpdate,
-        currentVersion,
+        currentVersion: displayVersion, // Show git hash version in UI
         latestVersion: versionInfo.version,
         versionInfo,
       };
@@ -64,7 +65,7 @@ export class VersionService {
 
       return {
         hasUpdate: false,
-        currentVersion,
+        currentVersion: displayVersion, // Show git hash version in UI
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
