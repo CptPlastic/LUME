@@ -65,7 +65,7 @@ export class TauriSystemAPI {
     // Use both Tauri command and native notification
     try {
       await sendNotification({ title, body: message });
-    } catch (error) {
+    } catch {
       // Fallback to Tauri command
       await invoke('send_system_notification', { title, message });
     }

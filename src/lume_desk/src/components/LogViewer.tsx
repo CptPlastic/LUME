@@ -38,9 +38,9 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
     };
     
     return loggingService.getFilteredLogs(currentFilter);
-  }, [logs, selectedLevels, searchText]);
+  }, [selectedLevels, searchText]);
 
-  const stats = useMemo(() => loggingService.getLogStats(), [logs]);
+  const stats = useMemo(() => loggingService.getLogStats(), []);
 
   const handleLevelToggle = (level: LogEntry['level']) => {
     const newSelected = new Set(selectedLevels);
