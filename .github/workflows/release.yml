@@ -179,19 +179,28 @@ jobs:
         run: |
           cd src/lume_desk/src-tauri
           # Generate key pair for this release
-          npx tauri signer generate --ci
+          KEYS=$(npx tauri signer generate --ci)
+          echo "Generated keys output:"
+          echo "$KEYS"
+          
+          # Extract the public key from the output
+          PUBKEY=$(echo "$KEYS" | grep -A1 "Your public key was generated successfully:" | tail -n1)
+          echo "TAURI_PUBLIC_KEY=$PUBKEY" >> $GITHUB_ENV
+          
+          # Extract the private key from the output  
+          PRIVKEY=$(echo "$KEYS" | grep -A1 "Keep it secret!" | tail -n1)
+          echo "TAURI_PRIVATE_KEY=$PRIVKEY" >> $GITHUB_ENV
+          
           echo "✅ Generated Tauri updater signing keys"
         shell: bash
 
       - name: Configure updater public key
         run: |
           cd src/lume_desk/src-tauri
-          # Extract public key and update config
-          PUBKEY=$(cat tauri.key.pub | tr -d '\n')
           # Update tauri.conf.json with the public key
-          sed -i.bak 's/"pubkey": ""/"pubkey": "'$PUBKEY'"/' tauri.conf.json
+          sed -i.bak 's/"pubkey": ""/"pubkey": "'$TAURI_PUBLIC_KEY'"/' tauri.conf.json
           rm tauri.conf.json.bak || true
-          echo "✅ Updated tauri.conf.json with public key: ${PUBKEY:0:50}..."
+          echo "✅ Updated tauri.conf.json with public key: ${TAURI_PUBLIC_KEY:0:50}..."
         shell: bash
 
       - name: Check for code signing secrets (macOS)
@@ -212,7 +221,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY_PATH: src/lume_desk/src-tauri/tauri.key
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -234,7 +243,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY_PATH: src/lume_desk/src-tauri/tauri.key
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
         with:
           projectPath: ./src/lume_desk
           tagName: ${{ needs.get-version.outputs.tag-name }}
