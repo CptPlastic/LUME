@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Download, Trash2, Search, Filter, CheckCircle, AlertCircle, Info, Zap, Bug } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { X, Download, Trash2, Search, Filter, CheckCircle, AlertCircle, Info, Zap, Bug, ArrowDown } from 'lucide-react';
 import type { LogEntry, LogFilter } from '../services/logging-service';
 import { loggingService } from '../services/logging-service';
 
@@ -16,6 +16,10 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
   );
   const [searchText, setSearchText] = useState('');
   const [showStackTrace, setShowStackTrace] = useState(false);
+  const [newLogCount, setNewLogCount] = useState(0);
+  
+  // Ref for auto-scrolling
+  const logsContainerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,11 +29,17 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
 
     // Subscribe to log updates
     const unsubscribe = loggingService.subscribe((newLogs) => {
+      const previousCount = logs.length;
       setLogs(newLogs);
+      
+      // If not auto-scrolling, track new logs
+      if (!autoScroll && newLogs.length > previousCount) {
+        setNewLogCount(prev => prev + (newLogs.length - previousCount));
+      }
     });
 
     return unsubscribe;
-  }, [isOpen]);
+  }, [isOpen, autoScroll, logs.length]);
 
   const filteredLogs = useMemo(() => {
     const currentFilter: LogFilter = {
@@ -38,9 +48,53 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
     };
     
     return loggingService.getFilteredLogs(currentFilter);
-  }, [selectedLevels, searchText]);
+  }, [selectedLevels, searchText, logs]); // Added logs as dependency to ensure real-time updates
 
-  const stats = useMemo(() => loggingService.getLogStats(), []);
+  const stats = useMemo(() => loggingService.getLogStats(), [logs]); // Added logs dependency
+
+  // Auto-scroll effect - should depend on filteredLogs, not just logs
+  useEffect(() => {
+    if (autoScroll && logsContainerRef.current) {
+      // Reset new log count when auto-scroll is active
+      setNewLogCount(0);
+      
+      // Use requestAnimationFrame to ensure scroll happens after DOM update
+      requestAnimationFrame(() => {
+        if (logsContainerRef.current) {
+          logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [filteredLogs, autoScroll]);
+
+  // Handle scroll events to disable auto-scroll when user scrolls up
+  const handleScroll = useCallback(() => {
+    if (!logsContainerRef.current || !autoScroll) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = logsContainerRef.current;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 20; // Increased threshold
+    
+    if (!isAtBottom) {
+      setAutoScroll(false);
+    }
+  }, [autoScroll]);
+
+  useEffect(() => {
+    const container = logsContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  // Function to manually scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+      setAutoScroll(true);
+      setNewLogCount(0); // Reset new log count when scrolling to bottom
+    }
+  }, []);
 
   const handleLevelToggle = (level: LogEntry['level']) => {
     const newSelected = new Set(selectedLevels);
@@ -113,6 +167,11 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
             <span className="text-sm text-gray-400">
               ({logs.length} total, {filteredLogs.length} shown)
             </span>
+            {!autoScroll && newLogCount > 0 && (
+              <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full">
+                {newLogCount} new
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -219,7 +278,10 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Logs Container */}
-        <div className="flex-1 overflow-auto p-4 font-mono text-sm">
+        <div 
+          ref={logsContainerRef}
+          className="flex-1 overflow-auto p-4 font-mono text-sm relative"
+        >
           <div className="space-y-1">
             {filteredLogs.map((log) => (
               <div key={log.id} className="group hover:bg-gray-800 p-2 rounded">
@@ -276,6 +338,22 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
               </div>
             )}
           </div>
+          
+          {/* Scroll to Bottom Button */}
+          {!autoScroll && filteredLogs.length > 0 && (
+            <button
+              onClick={scrollToBottom}
+              className="fixed bottom-24 right-8 bg-lume-primary hover:bg-lume-primary-dark text-white p-2 rounded-full shadow-lg transition-all duration-200 z-10 flex items-center space-x-1"
+              title="Scroll to bottom and enable auto-scroll"
+            >
+              <ArrowDown className="w-4 h-4" />
+              {newLogCount > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full px-1 min-w-[16px] h-4 flex items-center justify-center">
+                  {newLogCount > 99 ? '99+' : newLogCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Footer Stats */}
@@ -288,8 +366,14 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
               Info: {stats.byLevel.info || 0} | 
               Debug: {stats.byLevel.debug || 0}
             </div>
-            <div>
-              {autoScroll && filteredLogs.length > 0 && 'Auto-scrolling enabled'}
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
+                <div className={`w-2 h-2 rounded-full ${autoScroll ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                <span>
+                  {autoScroll ? 'Real-time updates active' : 'Auto-scroll disabled'}
+                </span>
+              </div>
+              {!autoScroll && '• Scroll to bottom to re-enable'}
             </div>
           </div>
         </div>

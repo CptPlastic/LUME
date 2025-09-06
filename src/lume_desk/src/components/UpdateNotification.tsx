@@ -52,12 +52,8 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  // Debug: Add some logging to see what's happening
-  console.log('🔍 UpdateNotification render:', { updateStatus, networkMode, isChecking, dismissed });
-
   // Check network mode and updates on component mount and set up periodic checks
   useEffect(() => {
-    console.log('🚀 UpdateNotification useEffect triggered');
     checkNetworkAndUpdates();
     
     // Set up periodic network checks every 30 seconds
@@ -65,7 +61,6 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
       if (!isChecking) {
         const mode = await VersionService.detectNetworkMode();
         if (mode !== networkMode) {
-          console.log('🔄 Network mode changed from', networkMode, 'to', mode);
           setNetworkMode(mode);
         }
       }
@@ -73,7 +68,6 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
 
     // Listen for browser online/offline events
     const handleOnline = async () => {
-      console.log('🌐 Browser online event detected');
       setTimeout(async () => {
         const mode = await VersionService.detectNetworkMode();
         setNetworkMode(mode);
@@ -81,7 +75,6 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
     };
 
     const handleOffline = () => {
-      console.log('🔌 Browser offline event detected');
       setNetworkMode('offline');
     };
 
@@ -101,27 +94,19 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkNetworkAndUpdates = async () => {
-    console.log('🔍 checkNetworkAndUpdates called');
     setIsChecking(true);
     
     // Check network mode first
-    console.log('🌐 Detecting network mode...');
     const mode = await VersionService.detectNetworkMode();
-    console.log('🌐 Network mode detected:', mode);
     setNetworkMode(mode);
     
     // Only check for updates if online
     if (mode === 'online') {
-      console.log('📡 Network is online, checking for updates...');
       const status = await VersionService.autoCheckForUpdates();
-      console.log('📦 Update status received:', status);
       setUpdateStatus(status);
-    } else {
-      console.log('🔌 Network is not online, skipping update check');
     }
     
     setIsChecking(false);
-    console.log('✅ checkNetworkAndUpdates completed');
   };
 
   const handleCheckForUpdates = async () => {
@@ -139,29 +124,74 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
     setIsDownloading(true);
     const success = await VersionService.downloadUpdate(updateStatus.versionInfo);
     
-    if (success) {
-      console.log('✅ Update download started');
-    } else {
-      console.error('❌ Failed to start update download');
+    if (!success) {
+      // Could add user-friendly error handling here if needed
     }
     
     setIsDownloading(false);
   };
 
   const handleToggleOfflineMode = async () => {
-    console.log('🔄 Toggling offline mode from UpdateNotification');
     toggleOfflineMode();
     
     // Re-check network mode after toggle to update UI immediately
     setTimeout(async () => {
       const mode = await VersionService.detectNetworkMode();
       setNetworkMode(mode);
-      console.log('🌐 Network mode updated to:', mode);
     }, 100);
   };
 
   const handleDismiss = () => {
     setDismissed(true);
+  };
+
+  // Simple Markdown renderer for changelog
+  const renderMarkdown = (markdown: string) => {
+    if (!markdown) return null;
+    
+    const lines = markdown.split('\n');
+    const elements: React.ReactNode[] = [];
+    
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      const key = `md-${index}-${trimmed.substring(0, 10)}`;
+      
+      if (trimmed.startsWith('## ')) {
+        // H2 heading
+        elements.push(
+          <h3 key={key} className="font-semibold text-gray-200 mt-2 mb-1 text-sm">
+            {trimmed.substring(3)}
+          </h3>
+        );
+      } else if (trimmed.startsWith('# ')) {
+        // H1 heading
+        elements.push(
+          <h2 key={key} className="font-bold text-gray-100 mt-2 mb-1">
+            {trimmed.substring(2)}
+          </h2>
+        );
+      } else if (trimmed.startsWith('- ')) {
+        // Bullet point
+        elements.push(
+          <div key={key} className="flex items-start space-x-2 ml-2">
+            <span className="text-gray-500 mt-0.5">•</span>
+            <span className="text-gray-400 text-xs">{trimmed.substring(2)}</span>
+          </div>
+        );
+      } else if (trimmed === '') {
+        // Empty line
+        elements.push(<div key={key} className="h-1" />);
+      } else {
+        // Regular text
+        elements.push(
+          <p key={key} className="text-gray-400 text-xs">
+            {trimmed}
+          </p>
+        );
+      }
+    });
+    
+    return <div className="space-y-0.5">{elements}</div>;
   };
 
   const getNetworkIcon = () => {
@@ -290,8 +320,8 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
                 
                 {updateStatus.versionInfo.changelog && (
                   <div className="text-sm text-gray-400">
-                    <p className="font-medium mb-1">What's New:</p>
-                    <p>{updateStatus.versionInfo.changelog}</p>
+                    <p className="font-medium mb-2">What's New:</p>
+                    {renderMarkdown(updateStatus.versionInfo.changelog)}
                   </div>
                 )}
                 
@@ -309,6 +339,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
                           ? 'bg-red-600 hover:bg-red-700 text-white'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       }`}
+                      title="Downloads the update file. Due to security requirements, you may need to manually install it."
                     >
                       {isDownloading ? (
                         <div className="flex items-center space-x-2">
@@ -318,7 +349,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
                       ) : (
                         <div className="flex items-center space-x-2">
                           <Download className="w-4 h-4" />
-                          <span>{updateStatus.versionInfo.critical ? 'Update Now' : 'Download Update'}</span>
+                          <span>{updateStatus.versionInfo.critical ? 'Download Now' : 'Download Update'}</span>
                         </div>
                       )}
                     </button>
@@ -356,39 +387,6 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
             <div>
               <p className="text-sm text-yellow-200 font-medium">Update Check Failed</p>
               <p className="text-xs text-yellow-300">{updateStatus.error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Debug Section - only show in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 mt-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Debug Info</p>
-              <p className="text-xs text-gray-500">
-                Network: {networkMode} | Update: {updateStatus?.hasUpdate ? 'Available' : 'None'} | 
-                Current: {updateStatus?.currentVersion} | Latest: {updateStatus?.latestVersion}
-              </p>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleCheckForUpdates}
-                disabled={isChecking}
-                className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
-              >
-                {isChecking ? 'Checking...' : 'Force Check'}
-              </button>
-              <button
-                onClick={() => {
-                  console.log('🐛 Debug info:', { updateStatus, networkMode, isChecking, dismissed });
-                  console.log('🐛 localStorage:', localStorage.getItem('lume-version-check'));
-                }}
-                className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
-              >
-                Log State
-              </button>
             </div>
           </div>
         </div>
