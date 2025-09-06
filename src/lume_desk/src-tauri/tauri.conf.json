@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "LUME",
-  "version": "1.3.0",
+  "version": "../package.json",
   "identifier": "com.lume.controller",
   "build": {
     "frontendDist": "../dist",
@@ -19,7 +19,10 @@
         "resizable": true,
         "fullscreen": false,
         "minWidth": 800,
-        "minHeight": 600
+        "minHeight": 600,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true
       }
     ],
     "security": {
@@ -43,7 +46,11 @@
             "http:default",
             "updater:default",
             "shell:default",
-            "shell:allow-open"
+            "shell:allow-open",
+            "notification:default",
+            "os:default",
+            "process:default",
+            "window-state:default"
           ]
         }
       ]
@@ -67,8 +74,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "shortDescription": "Professional firework and lighting control",
+    "longDescription": "LUME Controller provides professional-grade control for firework displays and lighting systems. Create stunning shows with precise timing and effects.",
+    "category": "Entertainment",
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": true,
+      "entitlements": null,
+      "exceptionDomain": "localhost",
+      "frameworks": [],
+      "providerShortName": "LUME",
+      "signingIdentity": null
     },
     "windows": {
       "certificateThumbprint": null,
