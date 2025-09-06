@@ -52,8 +52,12 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
+  // Debug: Add some logging to see what's happening
+  console.log('🔍 UpdateNotification render:', { updateStatus, networkMode, isChecking, dismissed });
+
   // Check network mode and updates on component mount and set up periodic checks
   useEffect(() => {
+    console.log('🚀 UpdateNotification useEffect triggered');
     checkNetworkAndUpdates();
     
     // Set up periodic network checks every 30 seconds
@@ -97,19 +101,27 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkNetworkAndUpdates = async () => {
+    console.log('🔍 checkNetworkAndUpdates called');
     setIsChecking(true);
     
     // Check network mode first
+    console.log('🌐 Detecting network mode...');
     const mode = await VersionService.detectNetworkMode();
+    console.log('🌐 Network mode detected:', mode);
     setNetworkMode(mode);
     
     // Only check for updates if online
     if (mode === 'online') {
+      console.log('📡 Network is online, checking for updates...');
       const status = await VersionService.autoCheckForUpdates();
+      console.log('📦 Update status received:', status);
       setUpdateStatus(status);
+    } else {
+      console.log('🔌 Network is not online, skipping update check');
     }
     
     setIsChecking(false);
+    console.log('✅ checkNetworkAndUpdates completed');
   };
 
   const handleCheckForUpdates = async () => {
@@ -344,6 +356,39 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = () => {
             <div>
               <p className="text-sm text-yellow-200 font-medium">Update Check Failed</p>
               <p className="text-xs text-yellow-300">{updateStatus.error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Section - only show in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 mt-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400 font-medium">Debug Info</p>
+              <p className="text-xs text-gray-500">
+                Network: {networkMode} | Update: {updateStatus?.hasUpdate ? 'Available' : 'None'} | 
+                Current: {updateStatus?.currentVersion} | Latest: {updateStatus?.latestVersion}
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleCheckForUpdates}
+                disabled={isChecking}
+                className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+              >
+                {isChecking ? 'Checking...' : 'Force Check'}
+              </button>
+              <button
+                onClick={() => {
+                  console.log('🐛 Debug info:', { updateStatus, networkMode, isChecking, dismissed });
+                  console.log('🐛 localStorage:', localStorage.getItem('lume-version-check'));
+                }}
+                className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+              >
+                Log State
+              </button>
             </div>
           </div>
         </div>

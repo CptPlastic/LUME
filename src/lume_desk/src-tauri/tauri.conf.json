@@ -44,6 +44,7 @@
             "fs:allow-write-file",
             "core:default",
             "http:default",
+            "http:allow-fetch",
             "updater:default",
             "shell:default",
             "shell:allow-open",

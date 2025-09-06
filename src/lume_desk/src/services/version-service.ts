@@ -1,5 +1,50 @@
-import axios from 'axios';
 import { getAppVersion, getBaseVersion } from '../utils/version';
+
+// Hybrid fetch: Try multiple HTTP libraries for maximum compatibility
+async function hybridFetch(url: string, options?: RequestInit): Promise<Response> {
+  console.log(`🔍 hybridFetch called for: ${url}`);
+  
+  // First, try axios if available (converts to Response-like object)
+  try {
+    console.log('📡 Trying axios...');
+    const axios = await import('axios');
+    const axiosResponse = await axios.default.get(url, {
+      headers: options?.headers as Record<string, string>,
+      timeout: 10000,
+    });
+    
+    console.log('✅ axios request successful');
+    
+    // Convert axios response to Response-like object
+    return {
+      ok: axiosResponse.status >= 200 && axiosResponse.status < 300,
+      status: axiosResponse.status,
+      statusText: axiosResponse.statusText,
+      headers: new Headers(axiosResponse.headers as Record<string, string>),
+      json: async () => axiosResponse.data,
+      text: async () => JSON.stringify(axiosResponse.data),
+    } as Response;
+  } catch (axiosError) {
+    console.log('⚠️ axios failed:', axiosError);
+  }
+  
+  // Second, try Tauri's HTTP plugin if in Tauri environment
+  try {
+    if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      console.log('🚀 Trying Tauri HTTP plugin...');
+      const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+      const response = await tauriFetch(url, options);
+      console.log('✅ Tauri HTTP request successful');
+      return response;
+    }
+  } catch (tauriError) {
+    console.log('⚠️ Tauri HTTP failed:', tauriError);
+  }
+  
+  // Finally, fall back to browser's native fetch
+  console.log('🌐 Using browser fetch');
+  return fetch(url, options);
+}
 
 interface VersionInfo {
   version: string;
@@ -42,8 +87,9 @@ export class VersionService {
     console.log(`📡 Using update URL: ${this.UPDATE_CHECK_URL}`);
 
     try {
-      const response = await axios.get<VersionInfo>(this.UPDATE_CHECK_URL, {
-        timeout: 10000,
+      console.log('🌐 Making request to update server...');
+      const response = await hybridFetch(this.UPDATE_CHECK_URL, {
+        method: 'GET',
         headers: {
           'X-Current-Version': currentVersion,
           'X-Platform': this.getPlatform(),
@@ -51,7 +97,15 @@ export class VersionService {
         }
       });
 
-      const versionInfo = response.data;
+      console.log(`📨 Response status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log('📊 Parsing response JSON...');
+      const versionInfo = await response.json() as VersionInfo;
+      console.log('📦 Received version info:', versionInfo);
+      
       const compareResult = this.compareVersions(currentVersion, versionInfo.version);
       const hasUpdate = compareResult < 0;
       
@@ -73,6 +127,11 @@ export class VersionService {
 
     } catch (error) {
       console.error('❌ Failed to check for updates:', error);
+      console.error('❌ Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
       
       // Try to return cached result if network fails
       const cached = this.getCachedCheckResult();
@@ -111,7 +170,7 @@ export class VersionService {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       console.log('🔍 Testing internet connectivity via your API...');
-      const response = await fetch('https://api.p7n.co/ping', {
+      const response = await hybridFetch('https://api.p7n.co/ping', {
         method: 'GET',
         signal: controller.signal,
         cache: 'no-cache'
@@ -125,7 +184,7 @@ export class VersionService {
         // Even when online, check if we're also on LUME network for additional info
         try {
           // Try DNS resolution of lume-base.local to see if we're on the LUME network
-          await fetch('http://lume-base.local:22', {  // Try SSH port as it's commonly open
+          await hybridFetch('http://lume-base.local:22', {  // Try SSH port as it's commonly open
             method: 'HEAD',
             signal: AbortSignal.timeout(500),
             cache: 'no-cache'
@@ -150,7 +209,7 @@ export class VersionService {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         console.log('🔍 Fallback internet connectivity test...');
-        const response = await fetch('https://httpbin.org/status/200', {
+        const response = await hybridFetch('https://httpbin.org/status/200', {
           method: 'GET',
           signal: controller.signal,
           cache: 'no-cache'
@@ -179,7 +238,7 @@ export class VersionService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1000);
       
-      await fetch('http://lume-base.local:80', {
+      await hybridFetch('http://lume-base.local:80', {
         method: 'HEAD',
         signal: controller.signal,
         cache: 'no-cache'
@@ -215,7 +274,7 @@ export class VersionService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
         
-        const response = await fetch(testUrl, {
+        const response = await hybridFetch(testUrl, {
           method: 'GET',
           signal: controller.signal,
           cache: 'no-cache'
@@ -465,8 +524,24 @@ export class VersionService {
 
   // Compare semantic versions (returns -1, 0, or 1)
   private static compareVersions(version1: string, version2: string): number {
-    const v1parts = version1.split('.').map(n => parseInt(n, 10));
-    const v2parts = version2.split('.').map(n => parseInt(n, 10));
+    console.log(`🔍 Comparing versions: "${version1}" vs "${version2}"`);
+    
+    // Handle development version
+    if (version1.includes('dev')) {
+      console.log('🔧 Development version detected, treating as older than release');
+      return -1; // Dev version is always considered older
+    }
+    
+    const v1parts = version1.split('.').map(n => {
+      const parsed = parseInt(n, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    });
+    const v2parts = version2.split('.').map(n => {
+      const parsed = parseInt(n, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    });
+    
+    console.log(`🔍 Parsed versions: [${v1parts.join(',')}] vs [${v2parts.join(',')}]`);
     
     const maxLength = Math.max(v1parts.length, v2parts.length);
     
@@ -474,10 +549,17 @@ export class VersionService {
       const v1part = v1parts[i] || 0;
       const v2part = v2parts[i] || 0;
       
-      if (v1part < v2part) return -1;
-      if (v1part > v2part) return 1;
+      if (v1part < v2part) {
+        console.log(`🔍 Part ${i}: ${v1part} < ${v2part} = UPDATE NEEDED`);
+        return -1;
+      }
+      if (v1part > v2part) {
+        console.log(`🔍 Part ${i}: ${v1part} > ${v2part} = CURRENT IS NEWER`);
+        return 1;
+      }
     }
     
+    console.log(`🔍 Versions are equal`);
     return 0;
   }
 

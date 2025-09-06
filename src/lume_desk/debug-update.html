@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Update Check Debug</title>
+</head>
+<body>
+    <h1>LUME Update Check Debug</h1>
+    <button onclick="testAxios()">Test with Axios</button>
+    <button onclick="testFetch()">Test with Fetch</button>
+    <button onclick="testVersionService()">Test Version Service</button>
+    <div id="results"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        function log(message) {
+            console.log(message);
+            document.getElementById('results').innerHTML += '<p>' + message + '</p>';
+        }
+
+        async function testAxios() {
+            log('Testing with Axios...');
+            try {
+                const response = await axios.get('https://api.p7n.co/tauri');
+                log('Axios success: ' + JSON.stringify(response.data, null, 2));
+            } catch (error) {
+                log('Axios error: ' + error.message);
+            }
+        }
+
+        async function testFetch() {
+            log('Testing with Fetch...');
+            try {
+                const response = await fetch('https://api.p7n.co/tauri');
+                const data = await response.json();
+                log('Fetch success: ' + JSON.stringify(data, null, 2));
+            } catch (error) {
+                log('Fetch error: ' + error.message);
+            }
+        }
+
+        async function testVersionService() {
+            log('Testing Version Service...');
+            try {
+                // This won't work since we don't have the imports, but we can test the basic concept
+                const response = await fetch('https://api.p7n.co/tauri', {
+                    method: 'GET',
+                    headers: {
+                        'X-Current-Version': '1.3.0',
+                        'X-Platform': 'darwin',
+                        'User-Agent': 'LUME-Controller/1.3.0 (darwin)'
+                    }
+                });
+                const data = await response.json();
+                log('Version Service API success: ' + JSON.stringify(data, null, 2));
+                
+                // Test version comparison
+                const current = '1.3.0';
+                const latest = data.version;
+                log('Current version: ' + current);
+                log('Latest version: ' + latest);
+                
+                // Simple version comparison
+                const currentParts = current.split('.').map(n => parseInt(n, 10));
+                const latestParts = latest.split('.').map(n => parseInt(n, 10));
+                
+                for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+                    const currentPart = currentParts[i] || 0;
+                    const latestPart = latestParts[i] || 0;
+                    
+                    if (currentPart < latestPart) {
+                        log('UPDATE AVAILABLE!');
+                        break;
+                    } else if (currentPart > latestPart) {
+                        log('Current version is newer');
+                        break;
+                    }
+                }
+            } catch (error) {
+                log('Version Service test error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
