@@ -88,7 +88,7 @@ pub async fn test_controller_connection(address: String) -> Result<bool, String>
 
 // File operations enhanced
 #[command]
-pub async fn export_show(show_data: String, format: String) -> Result<String, String> {
+pub async fn export_show(_show_data: String, format: String) -> Result<String, String> {
     log::info!("Exporting show in format: {}", format);
     
     let export_id = uuid::Uuid::new_v4().to_string();
@@ -108,7 +108,7 @@ pub async fn export_show(show_data: String, format: String) -> Result<String, St
 }
 
 #[command]
-pub async fn validate_show_data(show_data: String) -> Result<HashMap<String, bool>, String> {
+pub async fn validate_show_data(_show_data: String) -> Result<HashMap<String, bool>, String> {
     log::info!("Validating show data...");
     
     let mut validation_results = HashMap::new();
