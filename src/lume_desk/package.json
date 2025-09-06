@@ -4,7 +4,7 @@
   "version": "1.3.3",
   "type": "module",
   "description": "LUME Desktop Controller - Professional firework and lighting control application",
-  "author": "LUME Team",
+  "author": "Jason Johnson",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
