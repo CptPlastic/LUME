@@ -30,7 +30,7 @@ interface UpdateStatus {
 }
 
 export class VersionService {
-  private static readonly UPDATE_CHECK_URL = import.meta.env.VITE_UPDATE_URL || 'https://api.p7n.co/tauri/check';
+  private static readonly UPDATE_CHECK_URL = import.meta.env.VITE_UPDATE_URL || 'https://api.p7n.co/tauri';
   private static readonly CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
   private static readonly STORAGE_KEY = 'lume-version-check';
 
