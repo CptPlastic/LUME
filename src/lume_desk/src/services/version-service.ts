@@ -30,7 +30,7 @@ interface UpdateStatus {
 }
 
 export class VersionService {
-  private static readonly UPDATE_CHECK_URL = import.meta.env.VITE_UPDATE_URL || 'https://api.lume-controller.com/updates/latest';
+  private static readonly UPDATE_CHECK_URL = import.meta.env.VITE_UPDATE_URL || 'https://api.p7n.co/tauri/check';
   private static readonly CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
   private static readonly STORAGE_KEY = 'lume-version-check';
 
@@ -46,7 +46,8 @@ export class VersionService {
         timeout: 10000,
         headers: {
           'X-Current-Version': currentVersion,
-          'X-Platform': this.getPlatform()
+          'X-Platform': this.getPlatform(),
+          'User-Agent': `LUME-Controller/${currentVersion} (${this.getPlatform()})`
         }
       });
 
