@@ -145,7 +145,7 @@ export class VersionService {
         
         return 'online';
       }
-    } catch (error) {
+    } catch {
       // Fallback to a reliable test endpoint if your API fails
       try {
         const controller = new AbortController();
@@ -162,7 +162,7 @@ export class VersionService {
         if (response.ok) {
           return 'online';
         }
-      } catch (fallbackError) {
+      } catch {
         // Fallback connectivity test also failed
       }
     }

@@ -47,10 +47,51 @@ const LogViewer: React.FC<LogViewerProps> = ({ isOpen, onClose }) => {
       searchText: searchText || undefined
     };
     
-    return loggingService.getFilteredLogs(currentFilter);
-  }, [selectedLevels, searchText, logs]); // Added logs as dependency to ensure real-time updates
+    // Filter the current logs state directly instead of calling service
+    return logs.filter(log => {
+      // Check level filter
+      if (currentFilter.level && !currentFilter.level.includes(log.level)) {
+        return false;
+      }
+      
+      // Check search text
+      if (currentFilter.searchText) {
+        const searchLower = currentFilter.searchText.toLowerCase();
+        return log.message.toLowerCase().includes(searchLower) ||
+               log.source?.toLowerCase().includes(searchLower);
+      }
+      
+      return true;
+    });
+  }, [logs, selectedLevels, searchText]);
 
-  const stats = useMemo(() => loggingService.getLogStats(), [logs]); // Added logs dependency
+  const stats = useMemo(() => {
+    const statsByLevel = {
+      log: 0,
+      error: 0,
+      warn: 0,
+      info: 0,
+      debug: 0
+    } as Record<LogEntry['level'], number>;
+    
+    const statsBySource = {} as Record<string, number>;
+    
+    logs.forEach(log => {
+      statsByLevel[log.level]++;
+      const source = log.source || 'unknown';
+      statsBySource[source] = (statsBySource[source] || 0) + 1;
+    });
+    
+    return {
+      total: logs.length,
+      byLevel: statsByLevel,
+      bySource: statsBySource,
+      timeRange: logs.length > 0 ? {
+        start: logs[0].timestamp,
+        end: logs[logs.length - 1].timestamp
+      } : null
+    };
+  }, [logs]);
 
   // Auto-scroll effect - should depend on filteredLogs, not just logs
   useEffect(() => {
