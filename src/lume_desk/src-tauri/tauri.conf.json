@@ -61,7 +61,7 @@
       "active": true,
       "endpoints": ["https://api.p7n.co/tauri"],
       "dialog": true,
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBMTY2N0QxRENENDY2NDkKUldSSlp0VGMwV2NXMnR5QitiTTJGTytQZHpVeHl6Mzhoc0pTTjFZREI1QmJsbmZ5djJOWEZuYjIK"
     }
   },
   "bundle": {

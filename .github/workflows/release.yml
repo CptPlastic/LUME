@@ -174,33 +174,25 @@ jobs:
           cat package.json | grep version
         shell: bash
 
-      - name: Generate Tauri updater signing key
-        id: tauri-key
+      - name: Verify Tauri signing configuration
         run: |
           cd src/lume_desk/src-tauri
-          # Generate key pair for this release
-          KEYS=$(npx tauri signer generate --ci)
-          echo "Generated keys output:"
-          echo "$KEYS"
-          
-          # Extract the public key from the output
-          PUBKEY=$(echo "$KEYS" | grep -A1 "Your public key was generated successfully:" | tail -n1)
-          echo "TAURI_PUBLIC_KEY=$PUBKEY" >> $GITHUB_ENV
-          
-          # Extract the private key from the output  
-          PRIVKEY=$(echo "$KEYS" | grep -A1 "Keep it secret!" | tail -n1)
-          echo "TAURI_PRIVATE_KEY=$PRIVKEY" >> $GITHUB_ENV
-          
-          echo "✅ Generated Tauri updater signing keys"
+          echo "✅ Using permanent Tauri signing key from repository secrets"
+          echo "✅ Public key already configured in tauri.conf.json"
+          # Verify public key is configured
+          if grep -q '"pubkey": ""' tauri.conf.json; then
+            echo "❌ Error: Public key not configured in tauri.conf.json"
+            exit 1
+          else
+            echo "✅ Public key is configured"
+          fi
         shell: bash
 
-      - name: Configure updater public key
+      - name: Generate signature files
         run: |
-          cd src/lume_desk/src-tauri
-          # Update tauri.conf.json with the public key
-          sed -i.bak 's/"pubkey": ""/"pubkey": "'$TAURI_PUBLIC_KEY'"/' tauri.conf.json
-          rm tauri.conf.json.bak || true
-          echo "✅ Updated tauri.conf.json with public key: ${TAURI_PUBLIC_KEY:0:50}..."
+          cd src/lume_desk
+          echo "✅ Tauri will automatically generate signatures during build"
+          echo "Signatures will be computed and made available via the updater endpoint"
         shell: bash
 
       - name: Check for code signing secrets (macOS)
@@ -221,7 +213,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -243,7 +235,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           projectPath: ./src/lume_desk
           tagName: ${{ needs.get-version.outputs.tag-name }}
